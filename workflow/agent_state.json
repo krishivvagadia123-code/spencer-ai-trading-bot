@@ -1,0 +1,22 @@
+{
+  "currentOwner": "gpt_reviewer",
+  "taskStatus": "passed",
+  "currentTaskPath": "workflow\\current_task.md",
+  "lastResultPath": "workflow\\outbox\\20260603-145553-build-repo-native-automation-bridge.md",
+  "lastResultJson": "workflow\\outbox\\20260603-145553-build-repo-native-automation-bridge.json",
+  "deploymentGateStatus": {
+    "deploymentAllowed": false,
+    "deploymentBlocked": true,
+    "decision": "FAIL",
+    "sourceModule": "flows_eval",
+    "reason": "DATA_UNAVAILABLE: only 1 real FII/DII flow row(s) available; 100 required. Do NOT build a strategy."
+  },
+  "paperOnlyStatus": {
+    "paperOnly": true,
+    "liveTradingAllowed": false,
+    "brokerExecutionAllowed": false,
+    "aiOrderApprovalAllowed": false,
+    "fakeDashboardDataAllowed": false
+  },
+  "updatedAt": "2026-06-03T14:55:53.371024+00:00"
+}
