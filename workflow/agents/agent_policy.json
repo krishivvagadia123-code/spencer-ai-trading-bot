@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "paperOnly": true,
+  "automaticFlow": [
+    {
+      "stage": "PLAN",
+      "agent": "claude_manager",
+      "role": "Claude may orchestrate research, sequence tasks, and convert goals into complete task files."
+    },
+    {
+      "stage": "BUILD",
+      "agent": "codex_builder",
+      "role": "Codex may edit approved repo files, including workflow agent files, and must run repo-native verification."
+    },
+    {
+      "stage": "TEST",
+      "agent": "codex_builder",
+      "role": "Codex runs declared test commands and records failures without changing trading authority."
+    },
+    {
+      "stage": "REVIEW",
+      "agent": "gpt_reviewer",
+      "role": "GPT reviews safety, strategy logic, tests, and missing evidence as advisory feedback."
+    },
+    {
+      "stage": "APPROVE",
+      "agent": "trading_authority",
+      "role": "Trading Authority is the final deterministic backend decision layer for paper state and risk gates."
+    },
+    {
+      "stage": "LOG",
+      "agent": "pipeline",
+      "role": "The local pipeline writes task status, logs, and deployment gate evidence."
+    }
+  ],
+  "display": {
+    "agent": "antigravity_designer",
+    "role": "Antigravity may only display verified backend truth."
+  },
+  "globalBlocks": [
+    "No agent can bypass risk gates.",
+    "No agent can enable live trading.",
+    "No agent can place broker orders.",
+    "No agent can approve orders.",
+    "No fake P&L.",
+    "No fake trade states.",
+    "No fake bot status.",
+    "No journal deletion."
+  ]
+}

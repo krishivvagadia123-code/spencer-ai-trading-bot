@@ -1,0 +1,18 @@
+{
+  "paperOnly": true,
+  "deploymentAllowed": false,
+  "deploymentBlocked": true,
+  "liveTradingAllowed": false,
+  "brokerExecutionAllowed": false,
+  "aiOrderApprovalAllowed": false,
+  "fakeDashboardDataAllowed": false,
+  "decision": "FAIL",
+  "sourceModule": "flows_eval",
+  "candidates": [],
+  "reason": "DATA_UNAVAILABLE: only 1 real FII/DII flow row(s) available; 100 required. Do NOT build a strategy.",
+  "createdTasks": [],
+  "existingTasks": [
+    "workflow/tasks/record_flows_eval_rejection.md"
+  ],
+  "updatedAt": "2026-06-03T14:01:26.322468+00:00"
+}

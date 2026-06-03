@@ -1,0 +1,94 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*secret*
+*secrets*
+*token*
+*api_key*
+*apikey*
+*credential*
+*credentials*
+
+# Broker and account-sensitive runtime files
+kite_bot.db*
+*.db
+*.sqlite
+*.sqlite3
+*journal*
+trades.csv
+control_state.json
+backend/state/
+strategy_leaderboard.json
+regime_trust.json
+mistake_trust.json
+
+# Private market data and manual research inputs
+data/**
+!data/**/
+!data/**/README.md
+!data/**/.gitkeep
+
+# Python runtime
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Node runtime
+node_modules/
+frontend/node_modules/
+backend/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Caches and generated artifacts
+.cache/
+cache/
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup*
+
+# Logs
+*.log
+spencer_server.log
+bot.log
+debug.log
+monitor.log
+workflow/logs/*
+!workflow/logs/.gitkeep
+!workflow/logs/README.md
+
+# Workflow local status sidecars
+workflow/tasks/.status/
+
+# OS and editor files
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+*.code-workspace
+
+# Keep package manifests and issue templates tracked
+!package.json
+!package-lock.json
+!.github/
+!.github/**
