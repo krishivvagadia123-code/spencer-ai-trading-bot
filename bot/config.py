@@ -6,6 +6,8 @@ All numeric constants are validated on load — corrupt config fails fast.
 from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
+ONE_STOCK_UNIVERSE: tuple[str, ...] = ("RELIANCE",)
+
 
 class RiskConfig(BaseModel):
     risk_per_trade_pct:      float = Field(1.0,  ge=0.1,  le=5.0)
@@ -96,7 +98,8 @@ class LiveTradingGate(BaseModel):
 
 
 class BotConfig(BaseModel):
-    starting_balance: float = Field(50_000.0, ge=1_000.0)
+    starting_balance: float = Field(5_000.0, ge=1_000.0)
+    universe: tuple[str, ...] = ONE_STOCK_UNIVERSE
     asset:      AssetClassConfig = AssetClassConfig()
     risk:       RiskConfig       = RiskConfig()
     indicators: IndicatorConfig  = IndicatorConfig()
@@ -124,16 +127,24 @@ def default_config() -> BotConfig:
 
 
 def crypto_inr_config() -> BotConfig:
-    """24/7 crypto-INR paper trading preset."""
+    """
+    Inactive legacy crypto-INR paper preset.
+
+    Spencer's production concept is one-stock NSE equity mode only. This preset
+    remains for old offline tests that exercise crypto math, but it is never a
+    runtime default and it keeps max_open_positions=1 so a broader position cap
+    cannot leak into the active one-stock account.
+    """
     return BotConfig(
         starting_balance=5_000.0,
+        universe=ONE_STOCK_UNIVERSE,
         asset=AssetClassConfig(asset_class="crypto", quote_currency="INR",
                                use_zerodha=False),
         risk=RiskConfig(
             risk_per_trade_pct=0.5,
             max_daily_loss_pct=1.0,
             max_drawdown_pct=3.0,
-            max_open_positions=3,
+            max_open_positions=1,
             max_symbol_notional_pct=10.0,
             max_total_exposure_pct=30.0,
             max_symbol_notional_inr=2_000.0,

@@ -19,7 +19,7 @@ import {
   X,
 } from "lucide-react";
 import { NSE_STOCKS } from "./stocks";
-import { NIFTY50_SYMS, SPENCER_API_BASE } from "./utils/constants";
+import { NIFTY50_SYMS, ONE_STOCK_SYMBOL, SPENCER_API_BASE } from "./utils/constants";
 
 const LOCAL_USER = { id: "local", name: "Trader", email: "" };
 const DEFAULT_PROFILE = {
@@ -28,7 +28,7 @@ const DEFAULT_PROFILE = {
   tradeType: "Paper Journal",
   risk: "Capital Defense",
   budget: 5000,
-  selectedStocks: NSE_STOCKS.slice(0, 18).map((s) => s.symbol),
+  selectedStocks: [ONE_STOCK_SYMBOL],
 };
 const PAGES = [
   ["Dashboard", BarChart3],
@@ -89,23 +89,43 @@ const statusTone = (value) => {
   if (text.includes("unavailable") || text.includes("disconnected") || text.includes("error")) return "text-red-600";
   return "text-[#020617]";
 };
+const oneStockProfile = (profile = {}) => ({
+  ...DEFAULT_PROFILE,
+  ...profile,
+  budget: 5000,
+  selectedStocks: [ONE_STOCK_SYMBOL],
+});
+const priceText = (value) => (isMissing(value) ? "awaiting first real quote" : money(value, 2));
+const priceMeta = (source) => source?.priceLabel || source?.marketStateLabel || "awaiting first real quote";
+
+function PriceStack({ value, source, align = "right" }) {
+  return (
+    <span className={`block ${align === "right" ? "text-right" : "text-left"}`}>
+      <span className="block font-semibold">{priceText(value)}</span>
+      <span className="block text-[10px] font-medium normal-case tracking-normal text-[#94a3b8]">{priceMeta(source)}</span>
+    </span>
+  );
+}
 
 function useLocalProfile() {
   const [profile, setProfile] = useState(() => {
     try {
-      return { ...DEFAULT_PROFILE, ...(JSON.parse(localStorage.getItem("spencer-profile") || "null") || {}) };
+      return oneStockProfile(JSON.parse(localStorage.getItem("spencer-profile") || "null") || {});
     } catch {
-      return DEFAULT_PROFILE;
+      return oneStockProfile();
     }
   });
+  const setOneStockProfile = useCallback((next) => {
+    setProfile((previous) => oneStockProfile(typeof next === "function" ? next(previous) : next));
+  }, []);
   useEffect(() => {
     try {
-      localStorage.setItem("spencer-profile", JSON.stringify(profile));
+      localStorage.setItem("spencer-profile", JSON.stringify(oneStockProfile(profile)));
     } catch {
       // Local profile persistence is best-effort only.
     }
   }, [profile]);
-  return [profile, setProfile];
+  return [profile, setOneStockProfile];
 }
 
 function useBotState(profile) {
@@ -141,7 +161,7 @@ function useBotState(profile) {
         await fetch(`${SPENCER_API_BASE}/api/bot/config`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ budget: profile?.budget || 5000 }),
+          body: JSON.stringify({ budget: 5000, symbol: ONE_STOCK_SYMBOL }),
         });
       } catch {
         // The state poll owns visible backend status.
@@ -305,7 +325,7 @@ function TickerBar({ stocks, quotes }) {
               <span className={`h-1.5 w-1.5 rounded-full ${up === null ? "bg-gray-500" : up ? "bg-green-400" : "bg-red-400"}`} />
               <span>{stock.symbol}</span>
               <span className={up === false ? "text-red-400" : "text-green-400"}>
-                {isMissing(quote.price) ? "N/A" : money(quote.price, 2)}
+                <PriceStack value={quote.price} source={quote} align="left" />
               </span>
               {!isMissing(change) && <span className={up ? "text-green-400" : "text-red-400"}>{up ? "+" : ""}{change.toFixed(2)}%</span>}
             </span>
@@ -370,7 +390,7 @@ function Sidebar({ selectedStock, setSelectedStock, allowedStocks, quoteMap, quo
   const rows = useMemo(() => {
     const term = query.toLowerCase().trim();
     const source = term
-      ? NSE_STOCKS.filter((s) => `${s.symbol} ${s.name} ${s.sector}`.toLowerCase().includes(term)).slice(0, 60)
+      ? allowedStocks.filter((s) => `${s.symbol} ${s.name} ${s.sector}`.toLowerCase().includes(term))
       : allowedStocks;
     return source;
   }, [query, allowedStocks]);
@@ -379,7 +399,7 @@ function Sidebar({ selectedStock, setSelectedStock, allowedStocks, quoteMap, quo
     <aside className="hidden w-[280px] shrink-0 flex-col border-r border-[#e5e7eb] bg-white p-3 md:flex">
       <div className="mb-3 px-2">
         <div className="text-sm font-semibold text-[#020617]">Stocks</div>
-        <div className="text-xs text-[#64748b]">{NSE_STOCKS.length}+ NSE symbols</div>
+        <div className="text-xs text-[#64748b]">RELIANCE only</div>
       </div>
       <label className="mb-2 flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2.5">
         <Search className="h-3.5 w-3.5 text-[#94a3b8]" />
@@ -411,7 +431,7 @@ function Sidebar({ selectedStock, setSelectedStock, allowedStocks, quoteMap, quo
                 <span className="block truncate text-[11px] text-[#64748b]">{stock.name}</span>
               </span>
               <span className="shrink-0 text-right text-[12px] font-semibold text-[#020617]">
-                {isMissing(quote.price) ? "N/A" : money(quote.price, 2)}
+                <PriceStack value={quote.price} source={quote} />
                 {!isMissing(change) && <span className={`block text-[10px] ${up ? "text-emerald-600" : "text-red-600"}`}>{up ? "+" : ""}{change.toFixed(2)}%</span>}
               </span>
             </button>
@@ -439,12 +459,13 @@ function PortfolioOverview({ botState, backendStatus, watchlistCount = 0 }) {
   const strategiesValue = botState?.activeStrategy ? 1 : "Data unavailable";
   const capital = botState?.capital || {};
   const metrics = botState?.metrics || {};
-  const totalValue = capital.totalValue ?? capital.cash ?? 0;
-  const totalPnl = capital.totalPnl ?? safeNumber(capital.realisedPnl) + safeNumber(capital.unrealisedPnl);
-  const top = holdings
+  const totalValue = capital.totalValue;
+  const totalPnl = capital.totalPnl;
+  const pricedHoldings = holdings.filter((holding) => !isMissing(holding.ltp));
+  const top = pricedHoldings
     .map((h) => ({ ...h, chgPct: safeNumber(h.avg) > 0 ? ((safeNumber(h.ltp) - safeNumber(h.avg)) / safeNumber(h.avg)) * 100 : null }))
     .sort((a, b) => safeNumber(b.chgPct) - safeNumber(a.chgPct))[0];
-  const worst = holdings
+  const worst = pricedHoldings
     .map((h) => ({ ...h, chgPct: safeNumber(h.avg) > 0 ? ((safeNumber(h.ltp) - safeNumber(h.avg)) / safeNumber(h.avg)) * 100 : null }))
     .sort((a, b) => safeNumber(a.chgPct) - safeNumber(b.chgPct))[0];
 
@@ -455,9 +476,9 @@ function PortfolioOverview({ botState, backendStatus, watchlistCount = 0 }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">Portfolio Value</div>
-              <div className="text-[32px] font-bold leading-none text-[#020617]">{money(totalValue)}</div>
-              <div className={`mt-2 inline-flex rounded-md border px-2 py-1 text-[12px] font-semibold ${totalPnl >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-                {totalPnl >= 0 ? "+" : ""}{money(totalPnl)} ({pct(capital.pnlPct)}) total P&L
+              <div className="text-[32px] font-bold leading-none text-[#020617]">{isMissing(totalValue) ? "awaiting first real quote" : money(totalValue)}</div>
+              <div className={`mt-2 inline-flex rounded-md border px-2 py-1 text-[12px] font-semibold ${safeNumber(totalPnl) >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
+                {isMissing(totalPnl) ? "awaiting first real quote" : `${totalPnl >= 0 ? "+" : ""}${money(totalPnl)} (${pct(capital.pnlPct)}) total P&L`}
               </div>
             </div>
             <div className="space-y-0.5 text-right text-[11px] text-[#64748b]">
@@ -496,8 +517,8 @@ function PortfolioOverview({ botState, backendStatus, watchlistCount = 0 }) {
           ["Closed Trades", metrics.closedTrades ?? closedTrades.length, "Backend realised rows"],
           ["Strategies", strategiesValue, botState?.activeStrategy ? "Backend active strategy" : "No verified strategy tests found."],
           ["Watchlist", watchlistCount, "Local config"],
-          ["Top Performer", top?.symbol || "N/A", top ? pct(top.chgPct) : "Data unavailable"],
-          ["Worst Performer", worst?.symbol || "N/A", worst ? pct(worst.chgPct) : "Data unavailable"],
+          ["Top Performer", top?.symbol || "No current position", top ? pct(top.chgPct) : "Data unavailable"],
+          ["Worst Performer", worst?.symbol || "No current position", worst ? pct(worst.chgPct) : "Data unavailable"],
         ].map(([label, value, sub]) => (
           <section key={label} className="rounded-xl border border-[#e5e7eb] bg-white p-4 shadow-sm">
             <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-[#94a3b8]">{label}</div>
@@ -590,22 +611,21 @@ function BrainWidget({ selectedStock }) {
 }
 
 function MarketPulseWidget() {
-  const { quotes, quoteStatus } = useQuotes(["^NSEI", "^BSESN"]);
+  const { quotes, quoteStatus } = useQuotes([ONE_STOCK_SYMBOL]);
   const Row = ({ label, q }) => (
     <div className="flex items-center justify-between rounded-md border border-gray-100 bg-[#f8fafc] px-3 py-2">
       <span className="text-[12px] font-semibold text-[#111827]">{label}</span>
       {q && !isMissing(q.price) ? (
-        <span className="text-right text-[13px] font-semibold">{money(q.price, 2)}</span>
+        <PriceStack value={q.price} source={q} />
       ) : (
-        <span className="text-[11px] text-[#94a3b8]">{quoteStatus === "checking" ? "loading..." : "Data unavailable"}</span>
+        <span className="text-[11px] text-[#94a3b8]">{quoteStatus === "checking" ? "checking quote..." : "awaiting first real quote"}</span>
       )}
     </div>
   );
   return (
     <WidgetShell title="Market Pulse" icon={Activity} badge={quoteStatus === "ready" ? "Live market data" : "Data unavailable"}>
       <div className="space-y-2">
-        <Row label="NIFTY 50" q={quotes["^NSEI"]} />
-        <Row label="SENSEX" q={quotes["^BSESN"]} />
+        <Row label={ONE_STOCK_SYMBOL} q={quotes[ONE_STOCK_SYMBOL]} />
         <div className="pt-1 text-center text-[10px] text-[#94a3b8]">Backend quote route only</div>
       </div>
     </WidgetShell>
@@ -760,8 +780,8 @@ function HoldingsPage({ botState, backendStatus }) {
         cards={[
           ["Holdings", holdings.length],
           ["Invested", money(capital.invested)],
-          ["Current Value", money(capital.currentValue)],
-          ["Unrealised P&L", `${safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}${money(capital.unrealisedPnl)} ${pct(capital.unrealisedPnlPct)}`],
+          ["Current Value", isMissing(capital.currentValue) ? "awaiting first real quote" : money(capital.currentValue)],
+          ["Unrealised P&L", isMissing(capital.unrealisedPnl) ? "awaiting first real quote" : `${safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}${money(capital.unrealisedPnl)} ${pct(capital.unrealisedPnlPct)}`],
         ]}
       />
       <HoldingsTable rows={holdings} />
@@ -791,7 +811,7 @@ function FundsPage({ botState, backendStatus, profile }) {
           ["Bot Budget", money(budget)],
           ["Invested", money(invested)],
           ["Free Cash", money(cash)],
-          ["Unrealised P&L", `${safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}${money(capital.unrealisedPnl)}`],
+          ["Unrealised P&L", isMissing(capital.unrealisedPnl) ? "awaiting first real quote" : `${safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}${money(capital.unrealisedPnl)}`],
         ]}
       />
       <section className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
@@ -1010,7 +1030,7 @@ function TradeTable({ title, rows, onTradeClick }) {
                   <td className="px-4 py-3 font-semibold text-[#020617]">{trade.symbol || "N/A"}</td>
                   <td className={`px-4 py-3 font-semibold ${trade.side === "BUY" ? "text-emerald-600" : trade.side === "SELL" ? "text-red-600" : "text-[#64748b]"}`}>{trade.side || "N/A"}</td>
                   <td className="px-4 py-3 text-[#374151]">{qty(trade.qty)}</td>
-                  <td className="px-4 py-3 text-[#374151]">{money(trade.price, 2)}</td>
+                  <td className="px-4 py-3 text-[#374151]"><PriceStack value={trade.price} source={{ priceLabel: trade.priceLabel || (trade.time ? `journaled at ${trade.time}` : null) }} /></td>
                   <td className={`px-4 py-3 font-semibold ${safeNumber(trade.pnl) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{isMissing(trade.pnl) ? "N/A" : `${trade.pnl >= 0 ? "+" : ""}${money(trade.pnl)}`}</td>
                   <td className="px-4 py-3 text-[#64748b]">{sanitizeReason(trade.reason)}</td>
                   <td className="px-4 py-3 text-[#64748b]">{trade.status || "N/A"}</td>
@@ -1041,7 +1061,7 @@ function OrderTable({ title, rows }) {
             order.symbol || "N/A",
             order.side || "N/A",
             qty(order.qty),
-            money(order.price, 2),
+            <PriceStack value={order.price} source={{ priceLabel: order.priceLabel || (order.time ? `journaled at ${order.time}` : null) }} />,
             sanitizeReason(order.reason),
             order.status || "N/A",
           ])}
@@ -1064,16 +1084,17 @@ function HoldingsTable({ rows }) {
         <SimpleTable
           headings={["Symbol", "Sector", "Qty", "Avg Cost", "LTP", "Value", "P&L"]}
           rows={rows.map((holding) => {
-            const rowPnl = (safeNumber(holding.ltp) - safeNumber(holding.avg)) * safeNumber(holding.qty);
-            const rowPct = safeNumber(holding.avg) > 0 ? ((safeNumber(holding.ltp) - safeNumber(holding.avg)) / safeNumber(holding.avg)) * 100 : null;
+            const hasLtp = !isMissing(holding.ltp);
+            const rowPnl = hasLtp ? (safeNumber(holding.ltp) - safeNumber(holding.avg)) * safeNumber(holding.qty) : null;
+            const rowPct = hasLtp && safeNumber(holding.avg) > 0 ? ((safeNumber(holding.ltp) - safeNumber(holding.avg)) / safeNumber(holding.avg)) * 100 : null;
             return [
               holding.symbol || "N/A",
               holding.sector || "N/A",
               qty(holding.qty),
               money(holding.avg, 2),
-              money(holding.ltp, 2),
-              money(safeNumber(holding.qty) * safeNumber(holding.ltp)),
-              `${rowPnl >= 0 ? "+" : ""}${money(rowPnl)} (${pct(rowPct)})`,
+              <PriceStack value={holding.ltp} source={holding} />,
+              hasLtp ? money(safeNumber(holding.qty) * safeNumber(holding.ltp)) : "awaiting first real quote",
+              hasLtp ? `${rowPnl >= 0 ? "+" : ""}${money(rowPnl)} (${pct(rowPct)})` : "awaiting first real quote",
             ];
           })}
         />
@@ -1095,8 +1116,15 @@ function PositionsTable({ rows }) {
         <SimpleTable
           headings={["Symbol", "Qty", "Avg", "LTP", "Unrealised P&L"]}
           rows={rows.map((position) => {
-            const rowPnl = (safeNumber(position.ltp) - safeNumber(position.avg)) * safeNumber(position.qty);
-            return [position.symbol || "N/A", qty(position.qty), money(position.avg, 2), money(position.ltp, 2), `${rowPnl >= 0 ? "+" : ""}${money(rowPnl)}`];
+            const hasLtp = !isMissing(position.ltp);
+            const rowPnl = hasLtp ? (safeNumber(position.ltp) - safeNumber(position.avg)) * safeNumber(position.qty) : null;
+            return [
+              position.symbol || "N/A",
+              qty(position.qty),
+              money(position.avg, 2),
+              <PriceStack value={position.ltp} source={position} />,
+              hasLtp ? `${rowPnl >= 0 ? "+" : ""}${money(rowPnl)}` : "awaiting first real quote",
+            ];
           })}
         />
       )}
@@ -1232,7 +1260,7 @@ function TradeDetailModal({ trade, onClose }) {
           </div>
           <div className="rounded-lg border border-gray-200 p-3">
             <div className="mb-1 text-[10px] uppercase tracking-wider text-[#94a3b8]">Price</div>
-            <div className="text-[16px] font-semibold text-[#020617]">{money(trade.price, 2)}</div>
+            <div className="text-[16px] font-semibold text-[#020617]"><PriceStack value={trade.price} source={{ priceLabel: trade.priceLabel || (trade.time ? `journaled at ${trade.time}` : null) }} align="left" /></div>
           </div>
         </div>
         <div className="rounded-lg border border-gray-100 bg-[#f8fafc] px-4 py-3">
@@ -1302,16 +1330,13 @@ export default function App() {
   const { botState, backendStatus, botHealth } = useBotState(profile);
   const [activePage, setActivePage] = useState("Dashboard");
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [selectedStock, setSelectedStock] = useState("RELIANCE");
+  const [selectedStock, setSelectedStock] = useState(ONE_STOCK_SYMBOL);
   const [showAddWidget, setShowAddWidget] = useState(false);
   const [selectedTrade, setSelectedTrade] = useState(null);
   const niftyStocks = useMemo(() => NSE_STOCKS.filter((stock) => NIFTY50_SYMS.includes(stock.symbol)), []);
-  const allowedStocks = useMemo(() => NSE_STOCKS.filter((stock) => profile.selectedStocks?.includes(stock.symbol)), [profile.selectedStocks]);
+  const allowedStocks = useMemo(() => NSE_STOCKS.filter((stock) => stock.symbol === ONE_STOCK_SYMBOL), []);
   const tickerStocks = useMemo(() => (allowedStocks.length ? allowedStocks : niftyStocks).slice(0, 8), [allowedStocks, niftyStocks]);
-  const quoteSymbols = useMemo(
-    () => [...new Set([selectedStock, ...tickerStocks.map((stock) => stock.symbol)].filter(Boolean))].slice(0, 3),
-    [selectedStock, tickerStocks],
-  );
+  const quoteSymbols = useMemo(() => [ONE_STOCK_SYMBOL], []);
   const { quotes, quoteStatus, quoteHealth } = useQuotes(quoteSymbols);
 
   const page = (() => {

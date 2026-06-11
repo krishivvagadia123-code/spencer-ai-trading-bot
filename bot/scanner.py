@@ -201,10 +201,7 @@ def scan_once(
             block_reasons=block_reasons,
             research_snapshot_id=snapshot.id,
             sizing_preview=sizing,
-            rejection_reason=(
-                "; ".join(block_reasons) if entry_blocked and block_reasons
-                else ("entry_blocked" if entry_blocked else None)
-            ),
+            rejection_reason="entry_blocked" if entry_blocked else None,
         )
         _persist(candidate)
         candidates.append(candidate)

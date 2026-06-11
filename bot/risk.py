@@ -114,6 +114,8 @@ def calculate_position_size(
     symbol_cap_total     = equity * risk_cfg.max_symbol_notional_pct / 100
     if getattr(risk_cfg, "max_symbol_notional_inr", None) is not None:
         symbol_cap_total = min(symbol_cap_total, risk_cfg.max_symbol_notional_inr)
+    elif product == "CRYPTO":
+        symbol_cap_total = min(symbol_cap_total, 5_000.0)
     symbol_cap_remaining = max(0.0, symbol_cap_total - current_symbol_exposure)
 
     # 4. Total exposure cap

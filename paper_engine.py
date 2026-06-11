@@ -31,7 +31,7 @@ from pathlib import Path
 from typing import Optional
 
 from bot import control
-from bot.config import default_config
+from bot.config import ONE_STOCK_UNIVERSE, default_config
 from bot.dashboard import (
     DEFAULT_DASHBOARD_PATH, export_dashboard, read_monitor_log_tail,
 )
@@ -67,68 +67,19 @@ CONTROL_DIR = BASE_DIR / "control"
 LOG_DIR     = CONTROL_DIR / "logs"
 TERMINAL_PORT = 8765
 
-# NSE equity mode. Watchlist uses yfinance symbol mappings; symbol validation in
-# healthcheck marks unavailable names so the supervisor skips them safely.
-WATCHLIST = {
-    "RELIANCE":   "RELIANCE.NS",
-    "TCS":        "TCS.NS",
-    "INFY":       "INFY.NS",
-    "HDFCBANK":   "HDFCBANK.NS",
-    "ICICIBANK":  "ICICIBANK.NS",
-    "SBIN":       "SBIN.NS",
-    "LT":         "LT.NS",
-    "AXISBANK":   "AXISBANK.NS",
-    "KOTAKBANK":  "KOTAKBANK.NS",
-    "ITC":        "ITC.NS",
-    "BHARTIARTL": "BHARTIARTL.NS",
-    "HINDUNILVR": "HINDUNILVR.NS",
-    "MARUTI":     "MARUTI.NS",
-    "TITAN":      "TITAN.NS",
-    "SUNPHARMA":  "SUNPHARMA.NS",
-    "WIPRO":      "WIPRO.NS",
-    "TATAMOTORS": "TATAMOTORS.NS",
-    "ADANIENT":   "ADANIENT.NS",
-    "BAJFINANCE": "BAJFINANCE.NS",
-    "ASIANPAINT": "ASIANPAINT.NS",
-    "AFFLE":      "AFFLE.NS",
-    "BSE":        "BSE.NS",
-    "NHPC":       "NHPC.NS",
-    "HCLTECH":    "HCLTECH.NS",
-    "TECHM":      "TECHM.NS",
-    "ULTRACEMCO": "ULTRACEMCO.NS",
-    "NESTLEIND":  "NESTLEIND.NS",
-    "POWERGRID":  "POWERGRID.NS",
-    "ONGC":       "ONGC.NS",
-    "NTPC":       "NTPC.NS",
-    "COALINDIA":  "COALINDIA.NS",
-    "JSWSTEEL":   "JSWSTEEL.NS",
-    "TATASTEEL":  "TATASTEEL.NS",
-    "CIPLA":      "CIPLA.NS",
-    "DRREDDY":    "DRREDDY.NS",
-    "DIVISLAB":   "DIVISLAB.NS",
-    "EICHERMOT":  "EICHERMOT.NS",
-    "HEROMOTOCO": "HEROMOTOCO.NS",
-    "BAJAJFINSV": "BAJAJFINSV.NS",
-    "BAJAJ-AUTO": "BAJAJ-AUTO.NS",
-    "M&M":        "M&M.NS",
-    "GRASIM":     "GRASIM.NS",
-    "HDFCLIFE":   "HDFCLIFE.NS",
-    "SBILIFE":    "SBILIFE.NS",
-    "APOLLOHOSP": "APOLLOHOSP.NS",
-    "BRITANNIA":  "BRITANNIA.NS",
-    "ADANIPORTS": "ADANIPORTS.NS",
-    "BPCL":       "BPCL.NS",
-    "IOC":        "IOC.NS",
-    "HINDALCO":   "HINDALCO.NS",
-    "INDUSINDBK": "INDUSINDBK.NS",
-    "TATACONSUM": "TATACONSUM.NS",
-    "SHRIRAMFIN": "SHRIRAMFIN.NS",
-    "TRENT":      "TRENT.NS",
-    "BEL":        "BEL.NS",
-    "JIOFIN":     "JIOFIN.NS",
-}
+# Spencer is now a one-stock paper account. All scanner and CLI entry paths
+# derive from this map, so non-RELIANCE symbols cannot enter the paper engine.
+WATCHLIST = {symbol: f"{symbol}.NS" for symbol in ONE_STOCK_UNIVERSE}
 
 TRADINGVIEW_SYMBOLS = {symbol: f"NSE:{symbol}" for symbol in WATCHLIST}
+LEGACY_CHART_SYMBOLS = {
+    "BTC-INR": "BINANCE:BTCUSDT",
+    "ETH-INR": "BINANCE:ETHUSDT",
+    "DOGE-INR": "BINANCE:DOGEUSDT",
+    "LINK-INR": "BINANCE:LINKUSDT",
+    "XRP-INR": "BINANCE:XRPUSDT",
+    "AVAX-INR": "BINANCE:AVAXUSDT",
+}
 INDEX_WATCH = {
     "NIFTY 50": "^NSEI",
     "SENSEX": "^BSESN",
@@ -164,11 +115,11 @@ CFG = _BASE_CFG.model_copy(update={
         "risk_per_trade_pct": 0.35,
         "max_daily_loss_pct": 1.0,
         "max_drawdown_pct": 3.0,
-        "max_open_positions": 3,
-        "max_symbol_notional_pct": 25.0,
-        "max_total_exposure_pct": 60.0,
-        "max_symbol_notional_inr": 15_000.0,
-        "max_total_notional_inr": 50_000.0,
+        "max_open_positions": 1,
+        "max_symbol_notional_pct": 100.0,
+        "max_total_exposure_pct": 100.0,
+        "max_symbol_notional_inr": 5_000.0,
+        "max_total_notional_inr": 5_000.0,
     }),
     "supervisor": _BASE_CFG.supervisor.model_copy(update={
         "min_total_score_to_buy": 0.72,
@@ -181,7 +132,7 @@ breaker = CircuitBreaker(threshold=5)
 
 # Heuristic ATR estimate — used only as a fallback when indicators absent
 DEFAULT_ATR_PCT = 0.012
-MAX_OPERATOR_BUDGET_INR = 50_000.0
+MAX_OPERATOR_BUDGET_INR = 5_000.0
 DEFAULT_OPERATOR_BUDGET_INR = 5_000.0
 _YFINANCE_IMPORT_CHECKED = False
 _YFINANCE_MODULE = None
@@ -508,7 +459,7 @@ def _unavailable_symbols() -> set:
 
 
 def tradingview_symbol_for(symbol: str) -> str:
-    return TRADINGVIEW_SYMBOLS.get(symbol, symbol)
+    return TRADINGVIEW_SYMBOLS.get(symbol, LEGACY_CHART_SYMBOLS.get(symbol, symbol))
 
 
 def tradingview_url_for(symbol: str) -> str:
@@ -657,7 +608,7 @@ def _archive_non_equity_positions(pf: Portfolio) -> bool:
     """
     legacy = [
         (sym, pos) for sym, pos in list(pf.state.positions.items())
-        if sym not in WATCHLIST
+        if sym.endswith("-INR")
     ]
     if not legacy:
         return False
@@ -1311,6 +1262,10 @@ def print_help() -> None:
 def cmd_buy(symbol: str, pf: Portfolio) -> None:
     if symbol not in WATCHLIST:
         print(f"  {symbol} not in watchlist."); return
+    if symbol in pf.state.positions:
+        print(f"  BUY rejected: already holding {symbol}")
+        log.info(f"BUY {symbol} rejected: already holding")
+        return
     day_start = get_day_start_equity(pf)
     quote = yfinance_quote_provider(symbol)
     if quote is None or not quote.is_usable:
@@ -2259,6 +2214,7 @@ if errorlevel 1 (
 )
 echo  [3/4] opening KiteBot Equity Console...
 start "" "%CTRL_DIR%\\KiteBot-Live-Coach.html" 2>nul
+"%VENV_PY%" paper_engine.py open-charts 3
 echo  [4/4] starting supervisor loop (Ctrl+C to stop)...
 echo        Phone URL will be written to "%CTRL_DIR%\\PHONE_TERMINAL_URL.txt"
 "%VENV_PY%" paper_engine.py run-all

@@ -245,19 +245,17 @@ def auto_buy_once(
             decisions.append(AutoBuyDecision(c.symbol, False,
                                               f"cooldown: {wait:.0f}s remaining"))
             continue
-        sizing_ok, sizing_reason = _sizing_preview_is_usable(c, fee_cfg, product)
-        if not sizing_ok:
-            decisions.append(AutoBuyDecision(
-                c.symbol, False, f"risk sizing rejected: {sizing_reason}",
-            ))
-            continue
-
-        # Fresh quote check
         quote = quote_provider(c.symbol)
         if quote is None or not quote.is_usable:
             decisions.append(AutoBuyDecision(c.symbol, False,
                                               f"quote not fresh/usable: "
                                               f"{quote.reject_reason if quote else 'none'}"))
+            continue
+        sizing_ok, sizing_reason = _sizing_preview_is_usable(c, fee_cfg, product)
+        if not sizing_ok:
+            decisions.append(AutoBuyDecision(
+                c.symbol, False, f"risk sizing rejected: {sizing_reason}",
+            ))
             continue
 
         # Delegate to engine.do_buy — this is the ONLY path to a position.

@@ -823,7 +823,7 @@ function tvEmbedUrl(d, symbol){
     .replace(/theme=[^&]*/, 'theme=' + encodeURIComponent(document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'));
   const url = d.tradingview_url || '';
   const m = url.match(/symbol=([^&]+)/);
-  const sym = m ? m[1] : 'BINANCE%3ADOGEUSDT';
+  const sym = m ? m[1] : 'NSE%3ARELIANCE';
   const theme = document.body.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   return 'https://www.tradingview.com/widgetembed/?symbol=' + sym + '&interval=' + encodeURIComponent(currentTimeframe) + '&theme=' + theme + '&style=1&timezone=Asia%2FKolkata&hide_top_toolbar=0&hide_side_toolbar=0&save_image=0';
 }
@@ -891,7 +891,7 @@ function render(d){
   sp.textContent = d.running_state || 'UNKNOWN';
   sp.className = 'pill ' + (d.running_state === 'RUNNING' ? 'good' : d.running_state === 'PAUSED' ? 'warn' : d.running_state === 'HALTED' ? 'bad' : '');
   $('active-symbol').textContent = activeSymbol || '-';
-  $('active-exchange').textContent = (d.exchange || 'BINANCE') + ' · ' + (d.mode || 'paper');
+  $('active-exchange').textContent = (d.exchange || 'NSE') + ' · ' + (d.mode || 'paper');
   const frame = $('tv-frame');
   const local = $('local-chart');
   const nextUrl = tvEmbedUrl(d, activeSymbol);
@@ -1302,4 +1302,4 @@ def ensure_coach_assets() -> Dict[str, Path]:
     Pine helpers stay available for old tests/manual experiments, but Pine is
     no longer part of the Windows runtime because the operator cannot use it.
     """
-    return {"html": write_live_coach_html()}
+    return {"pine": write_pine_overlay(), "html": write_live_coach_html()}

@@ -21,12 +21,16 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import Request, urlopen
 
+from bot.config import ONE_STOCK_UNIVERSE
 from bot.governance import build_action_capabilities, build_governance_snapshot
+from bot.market_data import IST
 
 PORT = 8787
 YAHOO_QUOTE = "https://query1.finance.yahoo.com/v7/finance/quote?symbols={symbols}"
 YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{ticker}?range={range_name}&interval={interval}&includePrePost=false&events=history"
 BASE_DIR = Path(__file__).resolve().parent
+ACCOUNT_EPOCH = "one_stock_reliance_v1"
+ACCOUNT_BASIS_INR = 5_000.0
 BOT_INTERVAL_SEC = 300
 _BOT_LOCK = threading.Lock()
 _BOT_THREAD: threading.Thread | None = None
@@ -237,6 +241,36 @@ def _quote_fallback(symbol: str) -> dict:
     }
 
 
+def _timestamp_ist_label(value: str | None) -> str | None:
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(IST).strftime("%H:%M")
+    except Exception:
+        return None
+
+
+def _attach_price_state(row: dict) -> dict:
+    status = str(row.get("status") or row.get("marketState") or "").upper()
+    has_price = row.get("price") is not None
+    asof = _timestamp_ist_label(row.get("timestamp") or row.get("fetchedAt"))
+    is_open = status in {"REGULAR", "OPEN"}
+    state = "OPEN" if is_open else "CLOSED"
+    if not has_price:
+        label = "awaiting first real quote"
+    elif asof:
+        label = f"{state} - as of {asof} IST"
+    else:
+        label = state
+    row["marketState"] = state
+    row["marketStateLabel"] = label
+    row["priceLabel"] = label
+    return row
+
+
 def _quote_rows(symbols: list[str]) -> list[dict]:
     if not symbols:
         return []
@@ -270,6 +304,7 @@ def _quote_rows(symbols: list[str]) -> list[dict]:
                 "status": (item.get("marketState") or "last_close").lower(),
                 "source": "Yahoo Finance quote",
             }
+            _attach_price_state(rows_by_symbol[symbol])
 
     rows = []
     for symbol in symbols:
@@ -289,7 +324,7 @@ def _quote_rows(symbols: list[str]) -> list[dict]:
                     "source": "Yahoo Finance fallback",
                     "error": str(exc),
                 }
-        rows.append(row)
+        rows.append(_attach_price_state(row))
     return rows
 
 
@@ -302,9 +337,9 @@ def _handoff_payload() -> dict:
         "frontendUrl": "http://localhost:5175/",
         "localApiBase": f"http://127.0.0.1:{PORT}",
         "endpoints": {
-            "quotes": "/api/quotes?symbols=RELIANCE,TCS,INFY,NHPC,NESTLEIND,POWERGRID",
+            "quotes": "/api/quotes?symbols=RELIANCE",
             "chart": "/api/chart?symbol=RELIANCE&interval=5m",
-            "research": "/api/research?symbols=RELIANCE,TCS,INFY",
+            "research": "/api/research?symbols=RELIANCE",
             "botStart": "POST /api/bot/start",
             "botStatus": "GET /api/bot/status",
             "governance": "GET /api/governance",
@@ -316,7 +351,7 @@ def _handoff_payload() -> dict:
             "Do not change Spencer's trading methods or paper-trading guardrails during a visual redesign.",
             "Keep Indian equities as the focus. Do not reintroduce crypto trading.",
             "Keep paper trading only unless a real broker integration is explicitly added and authenticated.",
-            "Available bot budget is Rs.5,000; losses reduce usable paper budget and profits may be reinvested.",
+            "Available bot budget is Rs.5,000 for RELIANCE only; no second open position is allowed.",
         ],
         "visualDirection": [
             "Cinematic full-screen home page with fixed video, bottom-only blur mask, liquid glass buttons, Inter typography, and a soft blue cloud tone.",
@@ -450,6 +485,88 @@ def _state_json(conn: sqlite3.Connection, key: str, default=None):
         return default
 
 
+def _epoch_context(conn: sqlite3.Connection) -> dict:
+    return {
+        "name": _state_json(conn, "account_epoch", ACCOUNT_EPOCH),
+        "basis": float(_state_json(conn, "account_epoch_basis_inr", ACCOUNT_BASIS_INR) or ACCOUNT_BASIS_INR),
+        "startedAt": _state_json(conn, "account_epoch_started_at", None),
+        "tradeIdStart": _state_json(conn, "account_epoch_trade_id_start", None),
+    }
+
+
+def _epoch_filter(ctx: dict) -> tuple[str, list]:
+    start_id = ctx.get("tradeIdStart")
+    if start_id is not None:
+        try:
+            return "id > ?", [int(start_id)]
+        except (TypeError, ValueError):
+            pass
+    started_at = ctx.get("startedAt")
+    if started_at:
+        return "ts >= ?", [str(started_at)]
+    return "1=1", []
+
+
+def _epoch_trade_rows(conn: sqlite3.Connection, ctx: dict, *, desc: bool = False, limit: int | None = None) -> list:
+    where, params = _epoch_filter(ctx)
+    order = "DESC" if desc else "ASC"
+    sql = f"SELECT * FROM trades WHERE {where} ORDER BY id {order}"
+    if limit is not None:
+        sql += " LIMIT ?"
+        params = [*params, int(limit)]
+    return conn.execute(sql, params).fetchall()
+
+
+def _portfolio_from_epoch_trades(conn: sqlite3.Connection, ctx: dict | None = None) -> dict:
+    ctx = ctx or _epoch_context(conn)
+    cash = float(ctx["basis"])
+    realized = 0.0
+    total_closed = 0
+    winning = 0
+    positions: dict[str, dict] = {}
+
+    for row in _epoch_trade_rows(conn, ctx):
+        symbol = str(row["symbol"]).upper()
+        action = str(row["action"]).upper()
+        price = float(row["price"])
+        qty = float(row["qty"])
+        value = float(row["value"] if row["value"] is not None else price * qty)
+        charges = float(row["charges"] or 0.0)
+        if action == "BUY":
+            cash = round(cash - value - charges, 2)
+            positions[symbol] = {
+                "symbol": symbol,
+                "qty": qty,
+                "entry_price": price,
+                "stop": row["stop"],
+                "target": row["target"],
+                "charges_buy": charges,
+                "entry_time": row["ts"],
+            }
+            continue
+        if action == "SELL":
+            pos = positions.pop(symbol, None)
+            buy_charges = float((pos or {}).get("charges_buy") or 0.0)
+            entry_price = float((pos or {}).get("entry_price") or price)
+            pnl = row["pnl"]
+            if pnl is None:
+                pnl = (price - entry_price) * qty - buy_charges - charges
+            pnl = round(float(pnl), 2)
+            realized = round(realized + pnl, 2)
+            total_closed += 1
+            if pnl > 0:
+                winning += 1
+            cash = round(cash + value - charges, 2)
+
+    return {
+        "cash": round(cash, 2),
+        "realized_pnl": round(realized, 2),
+        "positions": positions,
+        "total_trades": total_closed,
+        "winning_trades": winning,
+    }
+
+
 def _load_json_file(path: Path):
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -516,11 +633,14 @@ def _workflow_status() -> dict:
     }
 
 
-def _closed_trade_metrics(conn: sqlite3.Connection) -> dict:
+def _closed_trade_metrics(conn: sqlite3.Connection, ctx: dict | None = None) -> dict:
+    ctx = ctx or _epoch_context(conn)
+    where, params = _epoch_filter(ctx)
     rows = conn.execute(
-        "SELECT pnl FROM trades WHERE action='SELL' AND pnl IS NOT NULL"
+        f"SELECT pnl FROM trades WHERE action='SELL' AND pnl IS NOT NULL AND {where}",
+        params,
     ).fetchall()
-    pnls = [r[0] for r in rows]
+    pnls = [r["pnl"] if isinstance(r, sqlite3.Row) else r[0] for r in rows]
     n = len(pnls)
     wins = sum(1 for p in pnls if p > 0)
     losses = sum(1 for p in pnls if p < 0)
@@ -533,18 +653,17 @@ def _closed_trade_metrics(conn: sqlite3.Connection) -> dict:
     }
 
 
-def _recent_orders(conn: sqlite3.Connection, limit: int = 25) -> list[dict]:
-    rows = conn.execute(
-        "SELECT ts, symbol, action, price, qty, pnl, entry_reason, exit_reason "
-        "FROM trades ORDER BY id DESC LIMIT ?", (limit,)
-    ).fetchall()
+def _recent_orders(conn: sqlite3.Connection, ctx: dict | None = None, limit: int = 25) -> list[dict]:
+    ctx = ctx or _epoch_context(conn)
+    rows = _epoch_trade_rows(conn, ctx, desc=True, limit=limit)
     out = []
-    for ts, symbol, action, price, qty, pnl, entry_reason, exit_reason in rows:
+    for row in rows:
         out.append({
-            "time": ts, "symbol": symbol, "side": action,
-            "qty": qty, "price": round(price, 2) if price is not None else None,
-            "status": "COMPLETE", "pnl": round(pnl, 2) if pnl is not None else None,
-            "reason": exit_reason or entry_reason or "",
+            "time": row["ts"], "symbol": row["symbol"], "side": row["action"],
+            "qty": row["qty"], "price": round(row["price"], 2) if row["price"] is not None else None,
+            "priceLabel": f"journaled at {row['ts']}",
+            "status": "COMPLETE", "pnl": round(row["pnl"], 2) if row["pnl"] is not None else None,
+            "reason": row["exit_reason"] or row["entry_reason"] or "",
         })
     return out
 
@@ -562,55 +681,80 @@ def _real_bot_state() -> dict:
                 "workflow": _workflow_status()}
 
     conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
     try:
-        portfolio = _state_json(conn, "portfolio", {}) or {}
-        budget = _state_json(conn, "paper_budget_inr", 5000.0) or 5000.0
+        epoch = _epoch_context(conn)
+        portfolio = _portfolio_from_epoch_trades(conn, epoch)
+        budget = float(epoch["basis"])
         selected = _state_json(conn, "selected_strategy", None)
         heartbeat = _state_json(conn, "last_heartbeat", {}) or {}
 
         # Open positions -> holdings, priced with REAL live quotes where possible.
         positions = portfolio.get("positions") or {}
-        sym_prices: dict[str, float] = {}
+        quote_by_symbol: dict[str, dict] = {}
         if positions:
             try:
                 for row in _quote_rows(list(positions.keys())):
-                    if row.get("price") is not None:
-                        sym_prices[row["symbol"]] = row["price"]
+                    quote_by_symbol[row["symbol"]] = row
             except Exception:
                 pass
 
         holdings, invested, current_value = [], 0.0, 0.0
+        all_positions_priced = True
         for sym, p in positions.items():
             qty = float(p.get("qty") or p.get("quantity") or 0)
             avg = float(p.get("entry_price") or p.get("avg_price")
                         or p.get("avg") or p.get("entry") or 0)
-            ltp = float(sym_prices.get(sym) or avg)
+            quote_row = quote_by_symbol.get(sym) or {}
+            ltp_raw = quote_row.get("price")
+            ltp = float(ltp_raw) if ltp_raw is not None else None
             invested += qty * avg
-            current_value += qty * ltp
-            holdings.append({"symbol": sym, "qty": qty, "avg": round(avg, 2),
-                             "ltp": round(ltp, 2), "sector": "—"})
+            if ltp is None:
+                all_positions_priced = False
+            else:
+                current_value += qty * ltp
+            holdings.append({
+                "symbol": sym,
+                "qty": qty,
+                "avg": round(avg, 2),
+                "ltp": round(ltp, 2) if ltp is not None else None,
+                "priceLabel": quote_row.get("priceLabel") or "awaiting first real quote",
+                "marketState": quote_row.get("marketState"),
+                "timestamp": quote_row.get("timestamp"),
+                "sector": "NSE",
+            })
 
         cash = float(portfolio.get("cash", budget))
         realised = float(portfolio.get("realized_pnl", 0.0))
-        unrealised = current_value - invested
-        total_value = cash + current_value
-        total_pnl = realised + unrealised
+        if positions and not all_positions_priced:
+            unrealised = None
+            total_value = None
+            total_pnl = None
+            pnl_pct = None
+        else:
+            total_value = cash + current_value
+            total_pnl = total_value - budget
+            unrealised = total_pnl - realised
+            pnl_pct = round(total_pnl / budget * 100, 2) if budget else 0.0
 
         capital = {
+            "epoch": epoch["name"],
+            "epochStartedAt": epoch["startedAt"],
+            "basis": round(float(budget), 2),
             "budget": round(float(budget), 2),
             "cash": round(cash, 2),
             "invested": round(invested, 2),
-            "currentValue": round(current_value, 2),
-            "totalValue": round(total_value, 2),
-            "unrealisedPnl": round(unrealised, 2),
+            "currentValue": round(current_value, 2) if total_value is not None else None,
+            "totalValue": round(total_value, 2) if total_value is not None else None,
+            "unrealisedPnl": round(unrealised, 2) if unrealised is not None else None,
             "realisedPnl": round(realised, 2),
-            "totalPnl": round(total_pnl, 2),
-            "pnlPct": round(total_pnl / budget * 100, 2) if budget else 0.0,
-            "unrealisedPnlPct": round(unrealised / invested * 100, 2) if invested else 0.0,
+            "totalPnl": round(total_pnl, 2) if total_pnl is not None else None,
+            "pnlPct": pnl_pct,
+            "unrealisedPnlPct": round(unrealised / invested * 100, 2) if invested and unrealised is not None else None,
         }
 
-        metrics = _closed_trade_metrics(conn)
-        orders = _recent_orders(conn)
+        metrics = _closed_trade_metrics(conn, epoch)
+        orders = _recent_orders(conn, epoch)
         activity = [
             {"type": "trade",
              "text": f"{o['side']} {o['qty']} {o['symbol']} @ Rs.{o['price']}"
@@ -626,10 +770,12 @@ def _real_bot_state() -> dict:
             "simulated": False,
             "source": "real paper_engine journal (kite_bot.db)",
             "asof": datetime.now(timezone.utc).isoformat(),
+            "accountEpoch": epoch,
             "running": bot.get("running", False),
             "control": {"killed": bool(control.get("killed")),
                         "paused": bool(control.get("paused"))},
             "botWatching": selected,
+            "universe": list(ONE_STOCK_UNIVERSE),
             "capital": capital,
             "metrics": metrics,
             "holdings": holdings,
@@ -654,7 +800,7 @@ def _set_budget(amount: float) -> dict:
         amount = float(amount)
     except (TypeError, ValueError):
         return {"ok": False, "error": "budget must be a number"}
-    amount = max(1_000.0, min(10_000_000.0, amount))   # sane clamp
+    amount = ACCOUNT_BASIS_INR
     with sqlite3.connect(str(DB_PATH)) as conn:
         conn.execute(
             "INSERT INTO bot_state(key, value) VALUES('paper_budget_inr', ?) "
@@ -762,7 +908,7 @@ class Handler(BaseHTTPRequestHandler):
                 _json(self, 200, {"ok": True, **_chart(symbols[0], interval)})
                 return
             if parsed.path == "/api/research":
-                symbols = _symbols(qs.get("symbols", ["RELIANCE,TCS,INFY"])[0])
+                symbols = _symbols(qs.get("symbols", ["RELIANCE"])[0])
                 _json(self, 200, {"ok": True, "research": _research(symbols)})
                 return
             if parsed.path == "/api/bot/status":
