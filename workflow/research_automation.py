@@ -39,6 +39,7 @@ MODULE_FILES = {
     "delivery_eval": "bot/delivery_eval.py",
     "blockdeal_eval": "bot/blockdeal_eval.py",
     "flows_eval": "bot/flows_eval.py",
+    "news_sentiment_eval": "bot/news_sentiment_eval.py",
     "gapup_confirm": "bot/gapup_confirm.py",
     "walkforward": "bot/walkforward.py",
 }
@@ -49,6 +50,7 @@ MODULE_TESTS = {
     "delivery_eval": ["tests/test_delivery_eval.py"],
     "blockdeal_eval": ["tests/test_blockdeal_eval.py"],
     "flows_eval": ["tests/test_flows_eval.py"],
+    "news_sentiment_eval": ["tests/test_news_sentiment_eval.py"],
 }
 
 CONFIRMATION_MODULES = {

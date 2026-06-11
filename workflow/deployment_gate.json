@@ -7,12 +7,12 @@
   "aiOrderApprovalAllowed": false,
   "fakeDashboardDataAllowed": false,
   "decision": "FAIL",
-  "sourceModule": "flows_eval",
+  "sourceModule": "news_sentiment_eval",
   "candidates": [],
-  "reason": "DATA_UNAVAILABLE: only 1 real FII/DII flow row(s) available; 100 required. Do NOT build a strategy.",
+  "reason": "DATA_UNAVAILABLE: DATA_UNAVAILABLE_INSUFFICIENT_HISTORY: coverage probe found real rows in 2/12 checks; 8 cache-only checks were not probed live. Do NOT build a strategy.",
   "createdTasks": [],
   "existingTasks": [
-    "workflow/tasks/record_flows_eval_rejection.md"
+    "workflow/tasks/record_news_sentiment_eval_rejection.md"
   ],
-  "updatedAt": "2026-06-03T14:01:26.322468+00:00"
+  "updatedAt": "2026-06-03T16:42:07.388205+00:00"
 }

@@ -92,3 +92,16 @@ desktop.ini
 !package-lock.json
 !.github/
 !.github/**
+
+# Scratch / local-only artifacts (not part of the project source)
+extract.txt
+Run bot.txt
+FULL_PROJECT_SOURCE.md
+control/*.xlsx
+frontend/*.txt
+frontend/*.png
+frontend/dashboard_comps_original.jsx
+frontend/dash_extracted.jsx
+frontend/.npm-cache/
+frontend/dist/
+frontend/dist-verify-bot-safety/

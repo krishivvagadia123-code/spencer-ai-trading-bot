@@ -1,0 +1,27 @@
+[project]
+name = "kite-bot"
+version = "0.2.0"
+description = "NSE paper trading bot — read-and-advise, with Pydantic-validated state"
+requires-python = ">=3.10"
+
+dependencies = [
+    "yfinance>=0.2.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "python-dotenv>=1.0.0",
+    "alpaca-trade-api>=3.2.0",
+    "websocket-client>=1.9.0",
+    "pydantic>=2.0.0",
+    "openpyxl>=3.1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v"

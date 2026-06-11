@@ -522,11 +522,73 @@ full history; free NSE *event/flow APIs* do not. The remaining free + **historic
 source is **GDELT news tone** — chosen as the next automated research source so the pipeline
 keeps moving without waiting on manual data collection.
 
+## X. GDELT news sentiment (Codex) — reviewed + run → **DATA_UNAVAILABLE (API rate-limit)**
+- **Implementation review:** Codex delivered `gdelt_news.py` — an auditable Nifty-50
+  company→name map (aliases + notes per symbol), well-formed GDELT DOC queries
+  (`sourcecountry:india sourcelang:english`, quoted OR aliases), tone+volume timelines merged,
+  query-hash cache, `None` on insufficiency, **no fabrication** — and `news_sentiment_eval.py`
+  (sentiment-shock event study, earnings/gap confounder control, `MIN_OBSERVATIONS=100`,
+  `MIN_EVENTS=30`, DATA_UNAVAILABLE guard). **7 tests pass.** Code quality: high; correct.
+- **Safety review (verified):** paper-only ✓; no live trading ✓; no broker execution/SDK ✓;
+  no AI order approval ✓; no fabricated data/P&L ✓ (grep clean — only the module's own
+  "no live trading" declarations match); no strategy deployment ✓. Gate: blocked, paper-only.
+- **Research result:** DATA_UNAVAILABLE (recorded via automation; `record_news_sentiment_eval_rejection.md`).
+- **Root cause (diagnosed by orchestrator, direct probes):** **GDELT API rate-limiting — HTTP
+  429 Too Many Requests.** The eval fires ~100 requests in a burst (50 symbols × tone+volume)
+  with `retries=1` and **no inter-request pacing/backoff**, so GDELT throttles and most
+  companies return `None`. A direct 2-year query for RELIANCE (heavily covered) returned empty,
+  and paced single requests still hit 429 — so it is **NOT** bad mapping, **NOT** weak coverage,
+  **NOT** a cache or symbol-mismatch issue, **NOT** a date-range bug. It is an API query/rate
+  limit. *Secondary, unconfirmed:* the GDELT DOC 2.0 API may also be ~3-month coverage-limited
+  (could not measure while throttled).
+- **Signal vs data:** purely a DATA-ACCESS failure (zero observations). No statement made about
+  whether news predicts returns.
+- **Spencer Score Impact: no change (stays ~48/100).** No alpha tested; only a process gain
+  (a clean, auditable news-ingest path + company map). Infrastructure ≠ edge.
+
+## Pattern note (data walls, continued)
+Free NSE *price/positioning archives* have full history (delivery, bhavcopy). Free NSE
+*event/flow APIs* (block deals, FII/DII) are current-day/bot-protected. GDELT *can* be free +
+historical but its DOC API throttles aggressively and may be coverage-limited. The fix is an
+access-engineering task (throttle/backoff/cache + a coverage probe + possible GKG/BigQuery
+backfill), not a new source — GDELT is not yet proven unsuitable, only un-tuned.
+
+## Y. GDELT rate-limit + coverage fix (Codex) — reviewed → **NEEDS_GKG_BIGQUERY_OR_BULK_DATA**
+- **Implementation review:** Codex added real rate-limit safety to `gdelt_news.py` — 5s min
+  inter-request delay, exponential backoff on `{429, 503}`, honors `Retry-After`, cache-first
+  reads + duplicate-query prevention — plus a `coverage_probe()` over four 30-day windows
+  (now / −6mo / −1y / −2y) and a nuanced `_coverage_decision()` that separates rate-limited,
+  recent-only, and complete-coverage cases. Quality: high; honest; no fabrication.
+- **Test note (important):** `15 tests pass` — BUT only after I freed disk space. The host was
+  **100% full (0 bytes)**, which made 6 cache-writing tests ERROR with "No space left on device."
+  I cleared the re-fetchable `.cache/nse_delivery` (165M; not a journal) → 15/15 pass. The 6
+  errors were environmental, not code defects. **Operational flag: the disk is effectively full.**
+- **Safety review (verified):** paper-only ✓; no live trading ✓; no broker execution/SDK ✓; no
+  AI order approval ✓; no fabricated news/P&L ✓ (grep clean — only the modules' own declarations
+  match); no strategy deployment ✓. Gate: `decision: FAIL`, `sourceModule: news_sentiment_eval`,
+  blocked, paper-only.
+- **Coverage-probe result (cached, no API hammering):** decision
+  `DATA_UNAVAILABLE_INSUFFICIENT_HISTORY`; per-window merged-data: **current 1/3, −6mo 1/3,
+  −1y 0/3, −2y 0/3** (8 windows `NOT_PROBED_CACHE_MISS`). The resolved windows show **recent
+  data exists, historical (≥1y) does not**.
+- **Root cause:** the **GDELT DOC 2.0 API is a recent-only window (~3 months)** — confirmed by
+  the probe (recent windows return tone; 1y/2y return none across all 3 probe symbols). The
+  throttling fix worked (no longer rate-limited); the wall is now *historical depth*, not access.
+- **Decision (orchestrator): NEEDS_GKG_BIGQUERY_OR_BULK_DATA.** A historical news backtest needs
+  GDELT **GKG** (BigQuery or bulk CSV, 2015+), not the DOC API. The DOC API + a slow scheduled
+  collector is useful **forward-only** (NEEDS_SLOW_SCHEDULED_COLLECTOR) — viable for future data
+  but cannot supply history now. NOT structurally unsuitable (GKG is suitable); the DOC path is.
+  Per the rule: **do not keep hammering the DOC API for history.**
+- **Spencer Score Impact: no change (stays ~48/100).** Still no alpha tested (no historical
+  observations). Process gain only: a rate-limit-safe, auditable news-ingest path + an honest
+  coverage probe. Infrastructure ≠ edge.
+
 ## Still open (owned by Codex / next cycles / operator)
-- Operator (optional, revisitable): supply historical NSE bulk/block CSVs
-  (`workflow/tasks/blockdeals_manual_history.md`) and historical FII/DII CSVs to re-test those.
-- Orchestrator: next automated source = **GDELT news sentiment**
-  (`workflow/tasks/research_news_sentiment_gdelt.md`) — free + historical, highest remaining potential.
+- Codex: scope GDELT **GKG/BigQuery/bulk-CSV** historical news ingestion
+  (`workflow/tasks/scope_gdelt_gkg_history.md`) — feasibility, access, cost, and a small
+  proof-of-coverage before any full build. Stop using the DOC API for history.
+- Operator: free up disk space on the host (currently ~100% full) so research caches/tests run.
+- Operator (optional, revisitable): historical NSE bulk/block + FII/DII CSVs to re-test those.
 - Strategy specs remain forbidden until a feature clears the same confirm-or-kill bar gap_up failed.
 - Wire `regime_trust.json` into the live scanner's sizing (down-weight by current regime).
 - Populate `signal_log` or standardize on `signal_candidates` as the decision log.

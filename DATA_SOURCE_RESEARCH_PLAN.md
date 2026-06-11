@@ -111,7 +111,17 @@ first (the Codex task below).
   delivery/volume* once #2 exists (interaction effects).
 - **Cost:** ₹0. **Edge potential:** Medium, but standalone earnings drift already failed OOS.
 
-### 1. Historical news / sentiment  — high potential, hard
+### 1. Historical news / sentiment  — ⏸️ NEEDS_GKG_BIGQUERY_OR_BULK_DATA (DOC API is recent-only)
+> **Status (2026-06-03, updated):** rate-limit fix shipped (5s delay, exp backoff, `Retry-After`,
+> `{429,503}`, cache-first; 15 tests pass). The throttling is solved — the remaining wall is
+> **historical depth**. Coverage probe (now/−6mo/−1y/−2y): recent windows return real tone,
+> **1-year and 2-year windows return nothing** → the **GDELT DOC 2.0 API is a ~3-month recent-only
+> window**, unusable for a multi-year backtest.
+> **Decision: NEEDS_GKG_BIGQUERY_OR_BULK_DATA.** Historical news alpha requires GDELT **GKG**
+> (BigQuery or bulk CSV, 2015+). The DOC API + a slow scheduled collector is forward-only
+> (useful future, not enough now). Do NOT keep hammering the DOC API for history. NOT
+> structurally unsuitable — GKG is the right source. Task: `workflow/tasks/scope_gdelt_gkg_history.md`.
+> See AUDIT_REPORT.md §X and §Y.
 - **What:** timestamped news + sentiment per stock/sector for an event study.
 - **Where / free vs paid:**
   - **GDELT** (free): global news tone, has India coverage, historical — the best *free* path,

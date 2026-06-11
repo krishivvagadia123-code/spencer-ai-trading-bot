@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <title>Spencer AI</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <div id="error-log" style="display: none; color: red; padding: 20px; font-family: monospace; z-index: 99999; position: fixed; top: 0; left: 0; background: white; white-space: pre-wrap;"></div>
+    <script>
+      window.addEventListener('error', function(e) {
+        var el = document.getElementById('error-log');
+        el.style.display = 'block';
+        el.innerText += 'ERROR: ' + e.message + '\\n' + (e.error ? e.error.stack : '') + '\\n\\n';
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        var el = document.getElementById('error-log');
+        el.style.display = 'block';
+        el.innerText += 'PROMISE REJECTION: ' + e.reason + '\\n\\n';
+      });
+    </script>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
