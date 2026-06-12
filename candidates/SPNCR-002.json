@@ -1,0 +1,26 @@
+{
+  "id": "SPNCR-002",
+  "version": "1",
+  "hypothesis": "On days when RELIANCE sets a new full-session (25-bar) closing high accompanied by the heaviest volume of the last three hours (12 bars), institutional participation tends to produce a directional drift day; entering on that breakout and riding the rest of the session with a wide 1% stop and a 10-bar trailing mean exit captures a large fraction of the 1.70% median daily range in fewer, larger trades whose size exceeds the ~0.2% real round-trip cost. This is a NEW hypothesis (range-breakout day-drift), not a parameter tweak of the killed SPNCR-001 (short-horizon momentum churn): it trades at most about once per day, holds toward session end, and uses breakout-of-extremes rather than mean-relative momentum. If breakout days do not drift enough to clear costs, the hypothesis is false and the candidate dies.",
+  "symbol": "RELIANCE",
+  "interval": "15m",
+  "entry_rule": {
+    "all": [
+      {"left": {"field": "close"}, "op": ">=", "right": {"rolling": "max", "field": "close", "window": 25}},
+      {"left": {"field": "volume"}, "op": ">=", "right": {"rolling": "max", "field": "volume", "window": 12}},
+      {"left": {"field": "volume"}, "op": ">", "right": {"value": 0}}
+    ]
+  },
+  "exit_rule": {
+    "left": {"field": "close"}, "op": "<", "right": {"rolling": "mean", "field": "close", "window": 10}
+  },
+  "stop_rule": {"type": "fixed_pct", "pct": 0.01},
+  "sizing_rule": {"type": "max_affordable", "capital_fraction": 1.0},
+  "no_trade_conditions": [],
+  "execution_assumption": {"entry_fill": "next_candle_open", "exit_fill": "next_candle_open"},
+  "parameters": {"breakout_window": 25, "vol_max_window": 12, "trail_window": 10, "stop_pct": 0.01},
+  "tunable_parameters": [],
+  "capital": 5000.0,
+  "max_open_positions": 1,
+  "side": "LONG"
+}

@@ -61,11 +61,19 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
   net −₹45.53 after costs on 28 trades; archived in `candidates/SPNCR-001.md`;
   kill journaled in `backtest_kills`. Lesson: at ₹5,000 size the real round trip
   costs ~0.2%+ (slippage-dominated); viable candidates need fewer, larger moves.
+- SPNCR-002 (15m breakout day-drift): **KILLED at IN_SAMPLE 2026-06-12** —
+  9 trades, gross +₹31.83, costs ₹77.18, net −₹7.88 (edge −0.021% vs +0.619%
+  bar); archived in `candidates/SPNCR-002.md`. Lesson: lower frequency moved
+  net per trade from −0.16% to −0.02%; captured breakout drift is still ~7×
+  too small. Next hypothesis must select high-expected-range DAYS (gap or
+  volatility context), and a deeper dataset materially helps.
 
 ## In Flight
 
 - Operator: register the 18:00 IST scheduled task (one manual command).
-- Manager: Candidate SPNCR-002 (new hypothesis required — not a parameter tweak).
+- Manager: Candidate SPNCR-003 design (day-selection hypothesis) — may wait for
+  more collected sessions before testing, to avoid burning hypotheses on a
+  thin 58-session base.
 
 ## Next Tasks
 
