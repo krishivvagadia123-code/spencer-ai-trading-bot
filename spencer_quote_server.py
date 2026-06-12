@@ -494,6 +494,22 @@ def _epoch_context(conn: sqlite3.Connection) -> dict:
     }
 
 
+def _last_snapshot_date(conn: sqlite3.Connection | None = None) -> str | None:
+    owns_conn = conn is None
+    if conn is None:
+        if not DB_PATH.exists():
+            return None
+        conn = sqlite3.connect(str(DB_PATH))
+    try:
+        row = conn.execute("SELECT MAX(trade_date) FROM daily_prices").fetchone()
+    except sqlite3.Error:
+        return None
+    finally:
+        if owns_conn and conn is not None:
+            conn.close()
+    return row[0] if row and row[0] else None
+
+
 def _epoch_filter(ctx: dict) -> tuple[str, list]:
     start_id = ctx.get("tradeIdStart")
     if start_id is not None:
@@ -676,6 +692,7 @@ def _real_bot_state() -> dict:
         return {"ok": True, "simulated": False, "source": "kite_bot.db (absent)",
                 "note": "No journal yet — run the paper engine to populate real data.",
                 "capital": None, "holdings": [], "orders": [], "activity": [],
+                "lastSnapshotDate": None,
                 "metrics": {"closedTrades": 0, "wins": 0, "losses": 0, "winRate": 0.0},
                 "capabilities": governance["capabilities"], "governance": governance,
                 "workflow": _workflow_status()}
@@ -771,6 +788,7 @@ def _real_bot_state() -> dict:
             "source": "real paper_engine journal (kite_bot.db)",
             "asof": datetime.now(timezone.utc).isoformat(),
             "accountEpoch": epoch,
+            "lastSnapshotDate": _last_snapshot_date(conn),
             "running": bot.get("running", False),
             "control": {"killed": bool(control.get("killed")),
                         "paused": bool(control.get("paused"))},
@@ -900,7 +918,11 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if parsed.path == "/api/quotes":
                 symbols = _symbols(qs.get("symbols", [""])[0])
-                _json(self, 200, {"ok": True, "quotes": _quote_rows(symbols)})
+                payload = {"ok": True, "quotes": _quote_rows(symbols)}
+                last_snapshot_date = _last_snapshot_date()
+                if last_snapshot_date:
+                    payload["lastSnapshotDate"] = last_snapshot_date
+                _json(self, 200, payload)
                 return
             if parsed.path == "/api/chart":
                 symbols = _symbols(qs.get("symbol", ["RELIANCE"])[0]) or ["RELIANCE"]
