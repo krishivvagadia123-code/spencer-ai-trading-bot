@@ -145,3 +145,38 @@ def test_non_universe_symbols_are_never_collected(tmp_path):
     assert result.exit_code == 0
     assert called_symbols == ["RELIANCE"]
     assert [row["symbol"] for row in rows] == ["RELIANCE"]
+
+
+def test_in_progress_and_pseudo_candles_are_never_stored(tmp_path):
+    """Yahoo appends a live pseudo-candle stamped at the current second and,
+    during market hours, the latest boundary bar is still forming. Neither is
+    a final candle; storing them would freeze partial values forever."""
+    from datetime import datetime, timedelta
+    from bot.market_data import IST
+
+    db_path = tmp_path / "intraday.db"
+    log_path = tmp_path / "intraday.log"
+
+    now = datetime.now(IST)
+    pseudo_ts = now.replace(microsecond=0).isoformat()  # current-second stamp
+    forming = now.replace(minute=(now.minute // 15) * 15, second=0, microsecond=0)
+    final = forming - timedelta(minutes=15)
+
+    def fake_chart(symbol, interval, range_name):
+        return _chart([
+            _candle(final.isoformat(), 2500.0),     # completed -> stored
+            _candle(forming.isoformat(), 2501.0),   # window not elapsed -> skipped
+            _candle(pseudo_ts, 2502.0),             # off-grid pseudo bar -> skipped
+        ])
+
+    result = hist.backfill_intraday_history(
+        db_path=db_path,
+        intervals=("15m",),
+        chart_func=fake_chart,
+        log_path=log_path,
+    )
+
+    rows = _intraday_rows(db_path)
+    assert result.exit_code == 0
+    assert result.skipped_incomplete >= 2
+    assert [r["ts"] for r in rows] == [final.isoformat()]

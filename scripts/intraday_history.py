@@ -58,6 +58,7 @@ class HistoryResult:
     message: str
     inserted: int = 0
     skipped_null_ohlc: int = 0
+    skipped_incomplete: int = 0
     rows: list[dict] = field(default_factory=list)
 
 
@@ -127,6 +128,24 @@ def _candle_ts_ist(raw_ts) -> str:
     return parsed.astimezone(IST).isoformat()
 
 
+def _is_final_candle(ts_iso: str, interval: str, fetched_at_iso: str) -> bool:
+    """Only completed, boundary-aligned candles may be stored.
+
+    Yahoo's chart payload appends the live in-progress bar stamped at the
+    current second (e.g. 09:48:38, O=H=L=C, volume 0) and, during market
+    hours, the latest boundary bar is still forming. Storing either would
+    freeze a partial value behind the UNIQUE constraint — a quietly wrong
+    candle forever. A candle is final only if its timestamp sits on the
+    interval grid AND its window has fully elapsed at fetch time.
+    """
+    parsed = datetime.fromisoformat(str(ts_iso))
+    minutes = INTERVAL_MINUTES[interval]
+    if parsed.second != 0 or parsed.microsecond != 0 or parsed.minute % minutes != 0:
+        return False
+    fetched = datetime.fromisoformat(str(fetched_at_iso))
+    return parsed + timedelta(minutes=minutes) <= fetched
+
+
 def _normalize_candle(
     *,
     symbol: str,
@@ -161,9 +180,10 @@ def _collect_rows(
     symbols: Sequence[str],
     intervals: Sequence[str],
     chart_func: ChartFunc,
-) -> tuple[list[dict], int]:
+) -> tuple[list[dict], int, int]:
     rows: list[dict] = []
     skipped_null_ohlc = 0
+    skipped_incomplete = 0
     fetched_at = datetime.now(IST).isoformat()
     created_at = fetched_at
     for symbol in symbols:
@@ -187,11 +207,14 @@ def _collect_rows(
                 if skipped:
                     skipped_null_ohlc += 1
                     continue
+                if not _is_final_candle(row["ts"], interval, fetched_at):
+                    skipped_incomplete += 1
+                    continue
                 rows.append(row)
                 valid_for_window += 1
             if valid_for_window == 0:
                 raise ValueError(f"{symbol} {interval}: no valid OHLC candles returned")
-    return rows, skipped_null_ohlc
+    return rows, skipped_null_ohlc, skipped_incomplete
 
 
 def _insert_rows(db_path: Path, rows: Sequence[dict]) -> int:
@@ -238,7 +261,7 @@ def backfill_intraday_history(
         return HistoryResult(exit_code=1, message=message)
 
     try:
-        rows, skipped_null_ohlc = _collect_rows(
+        rows, skipped_null_ohlc, skipped_incomplete = _collect_rows(
             symbols=selected_symbols,
             intervals=selected_intervals,
             chart_func=chart_func,
@@ -251,7 +274,8 @@ def backfill_intraday_history(
     inserted = _insert_rows(Path(db_path), rows)
     message = (
         f"intraday history complete: inserted={inserted}, "
-        f"valid_candles={len(rows)}, skipped_null_ohlc={skipped_null_ohlc}"
+        f"valid_candles={len(rows)}, skipped_null_ohlc={skipped_null_ohlc}, "
+        f"skipped_incomplete={skipped_incomplete}"
     )
     _log(message, log_path)
     return HistoryResult(
@@ -259,6 +283,7 @@ def backfill_intraday_history(
         message=message,
         inserted=inserted,
         skipped_null_ohlc=skipped_null_ohlc,
+        skipped_incomplete=skipped_incomplete,
         rows=rows,
     )
 
