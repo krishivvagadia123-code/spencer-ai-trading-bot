@@ -155,7 +155,12 @@ def _chunks(items: list[str], size: int) -> list[list[str]]:
     return [items[i:i + size] for i in range(0, len(items), size)]
 
 
-def _chart(symbol: str, interval: str = "5m", range_name: str | None = None) -> dict:
+def _chart(
+    symbol: str,
+    interval: str = "5m",
+    range_name: str | None = None,
+    max_candles: int | None = 260,
+) -> dict:
     interval = interval if interval in {"1m", "2m", "5m", "15m", "30m", "60m", "1d"} else "5m"
     range_name = range_name or ("7d" if interval != "1d" else "1y")
     ticker = _ticker(symbol)
@@ -184,7 +189,7 @@ def _chart(symbol: str, interval: str = "5m", range_name: str | None = None) -> 
     volumes = quote_rows.get("volume") or []
 
     candles = []
-    start = max(0, len(timestamps) - 260)
+    start = 0 if max_candles is None else max(0, len(timestamps) - max_candles)
     for idx in range(start, len(timestamps)):
         ts = timestamps[idx]
         try:

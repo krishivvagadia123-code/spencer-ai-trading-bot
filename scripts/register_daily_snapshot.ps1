@@ -3,6 +3,8 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
 $PythonExe = Join-Path $ProjectRoot ".venv\Scripts\python.exe"
 $SnapshotScript = Join-Path $ProjectRoot "scripts\daily_price_snapshot.py"
+$IntradayScript = Join-Path $ProjectRoot "scripts\intraday_history.py"
+$RunnerScript = Join-Path $ProjectRoot "scripts\run_daily_market_data.ps1"
 $TaskName = "SpencerDailySnapshot"
 
 if (-not (Test-Path $PythonExe)) {
@@ -13,7 +15,15 @@ if (-not (Test-Path $SnapshotScript)) {
     throw "Snapshot script not found at $SnapshotScript"
 }
 
-$TaskRun = "`"$PythonExe`" `"$SnapshotScript`""
+if (-not (Test-Path $IntradayScript)) {
+    throw "Intraday history script not found at $IntradayScript"
+}
+
+if (-not (Test-Path $RunnerScript)) {
+    throw "Daily market data runner not found at $RunnerScript"
+}
+
+$TaskRun = "powershell.exe -NoProfile -ExecutionPolicy Bypass -File `"$RunnerScript`""
 schtasks.exe /Create `
     /TN $TaskName `
     /SC DAILY `
@@ -22,4 +32,5 @@ schtasks.exe /Create `
     /F | Out-Null
 
 Write-Host "Registered scheduled task '$TaskName' for 18:00 local time (IST on this host)."
-Write-Host "Action: $PythonExe $SnapshotScript"
+Write-Host "Action: $TaskRun"
+Write-Host "Runner executes: $PythonExe $SnapshotScript, then $PythonExe $IntradayScript"
