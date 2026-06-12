@@ -17,11 +17,20 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
 - The legacy Node simulation backend has been deleted; the frontend talks only to
   the real Python quote server (`spencer_quote_server.py`, port 8787).
 
-## Current Score
+## Current Score (two scales, graded 2026-06-12 by the manager)
 
-Approximate Spencer score: 48/100. Infrastructure and honesty are strong; no
-validated, cost-clearing edge exists yet. The score moves only when journaled
-paper results clear costs consistently.
+- **Functional scale: 78/100.** Real data pipeline (EOD + intraday, final-candle
+  integrity), honest UI sync, full safety posture, research protocol, and a
+  working backtest harness (rolling-operand defect found and fixed with a
+  regression test). Loses points: scheduled task not yet registered by the
+  operator; 1m history still shallow; Antigravity UI redesign pending.
+- **Profitability scale: 4/100.** Zero validated edge. Candidate SPNCR-001
+  (intraday momentum) was tested and KILLED at in-sample: 28 trades, gross
+  +₹78.03, costs ₹239.93, net −₹45.53 — profitable before costs, not after.
+  Cost feasibility groundwork is the only credit.
+- Composite stays ~48/100. Per protocol, the score rises only on journaled,
+  cost-clearing results — never on infrastructure. (A verbal "58" grade was
+  checked and rejected: no journaled basis.)
 
 ## Safety State
 
@@ -46,11 +55,17 @@ paper results clear costs consistently.
   round-trip breakeven ≈ 0.106% vs median daily range 1.70% — costs are clearable
   intraday; delivery at 1 share needs 1.48% and is structurally near-unplayable.
 
+## Research Ledger (confirm-or-kill)
+
+- SPNCR-001 (15m momentum continuation): **KILLED at IN_SAMPLE 2026-06-12** —
+  net −₹45.53 after costs on 28 trades; archived in `candidates/SPNCR-001.md`;
+  kill journaled in `backtest_kills`. Lesson: at ₹5,000 size the real round trip
+  costs ~0.2%+ (slippage-dominated); viable candidates need fewer, larger moves.
+
 ## In Flight
 
-- Codex: `workflow/tasks/daily_price_snapshot.md` — daily automatic RELIANCE EOD
-  price snapshot via Windows Task Scheduler (append-only, honest failure states).
-- ChatGPT: `MASTERY_LEDGER.md` daily review template.
+- Operator: register the 18:00 IST scheduled task (one manual command).
+- Manager: Candidate SPNCR-002 (new hypothesis required — not a parameter tweak).
 
 ## Next Tasks
 

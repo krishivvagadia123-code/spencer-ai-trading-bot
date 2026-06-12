@@ -185,6 +185,11 @@ def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float 
         if name not in params:
             raise ValueError(f"unknown parameter: {name}")
         return params[name]
+    if "rolling" in spec:
+        # Must be checked before "field": a rolling spec carries a "field" key
+        # too, and falling into the field branch silently turns e.g.
+        # "close > rolling mean(close)" into "close > close" (never true).
+        return _rolling_value(spec, history)
     if "field" in spec:
         return getattr(history[-1], str(spec["field"]))
     if "lag" in spec:
@@ -195,25 +200,27 @@ def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float 
         if idx < 0:
             return float("nan")
         return getattr(history[idx], str(spec["lag"]))
-    if "rolling" in spec:
-        fn = str(spec["rolling"])
-        field = str(spec["field"])
-        window = int(spec["window"])
-        if window <= 0:
-            raise ValueError("rolling window must be positive")
-        if len(history) < window:
-            return float("nan")
-        vals = [float(getattr(c, field)) for c in history[-window:]]
-        if fn == "mean":
-            return sum(vals) / len(vals)
-        if fn == "min":
-            return min(vals)
-        if fn == "max":
-            return max(vals)
-        if fn == "sum":
-            return sum(vals)
-        raise ValueError(f"unsupported rolling function: {fn}")
     raise ValueError(f"unknown operand: {spec!r}")
+
+
+def _rolling_value(spec: dict, history: Sequence[Candle]) -> float:
+    fn = str(spec["rolling"])
+    field = str(spec["field"])
+    window = int(spec["window"])
+    if window <= 0:
+        raise ValueError("rolling window must be positive")
+    if len(history) < window:
+        return float("nan")
+    vals = [float(getattr(c, field)) for c in history[-window:]]
+    if fn == "mean":
+        return sum(vals) / len(vals)
+    if fn == "min":
+        return min(vals)
+    if fn == "max":
+        return max(vals)
+    if fn == "sum":
+        return sum(vals)
+    raise ValueError(f"unsupported rolling function: {fn}")
 
 
 def evaluate_rule(rule: Any, history: Sequence[Candle], params: dict) -> bool:

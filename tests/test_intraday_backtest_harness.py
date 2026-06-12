@@ -231,3 +231,29 @@ def test_killed_candidate_refuses_tweaked_params_without_new_hypothesis(tmp_path
         parameters={"threshold": 101},
     )
     assert_not_forbidden_by_kill_registry(db_path, new_candidate)
+
+
+def test_rolling_operand_is_not_shadowed_by_its_field_key():
+    """A rolling spec carries a "field" key; operand resolution must hit the
+    rolling branch first, otherwise "close > rolling mean(close)" silently
+    becomes "close > close" and no rule referencing a rolling value can ever
+    fire (the SPNCR-001 false-kill bug)."""
+    from datetime import datetime, timedelta, timezone
+    from bot.intraday_backtest import Candle, evaluate_rule
+
+    ist = timezone(timedelta(hours=5, minutes=30))
+    base = datetime(2026, 6, 1, 9, 15, tzinfo=ist)
+    closes = [100.0, 101.0, 102.0, 103.0, 110.0]
+    history = [
+        Candle(symbol="RELIANCE", interval="15m", ts=base + timedelta(minutes=15 * i),
+               open=c, high=c + 1, low=c - 1, close=c, volume=1000.0, source="test")
+        for i, c in enumerate(closes)
+    ]
+    rule = {
+        "left": {"field": "close"},
+        "op": ">",
+        "right": {"rolling": "mean", "field": "close", "window": 5},
+    }
+    # mean = 103.2, latest close = 110 -> must be True; the shadowed-field bug
+    # evaluated right as the latest close (110 > 110 = False).
+    assert evaluate_rule(rule, history, {}) is True

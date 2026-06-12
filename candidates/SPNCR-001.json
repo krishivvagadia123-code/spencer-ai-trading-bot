@@ -1,0 +1,27 @@
+{
+  "id": "SPNCR-001",
+  "version": "1",
+  "hypothesis": "RELIANCE, as India's most liquid large-cap, exhibits short-horizon intraday momentum persistence: when price closes above its 20-bar (about five trading hours of 15-minute candles) rolling mean, with two consecutive rising closes and volume above its own 20-bar mean, buying pressure tends to continue over the following bars by more than the round-trip cost (about 0.106% plus slippage, per docs/RELIANCE_COST_MATH.md). If this continuation does not exceed costs after a fixed protective stop, the hypothesis is false and the candidate dies.",
+  "symbol": "RELIANCE",
+  "interval": "15m",
+  "entry_rule": {
+    "all": [
+      {"left": {"field": "close"}, "op": ">", "right": {"rolling": "mean", "field": "close", "window": 20}},
+      {"left": {"field": "close"}, "op": ">", "right": {"lag": "close", "periods": 1}},
+      {"left": {"lag": "close", "periods": 1}, "op": ">", "right": {"lag": "close", "periods": 2}},
+      {"left": {"field": "volume"}, "op": ">", "right": {"rolling": "mean", "field": "volume", "window": 20}}
+    ]
+  },
+  "exit_rule": {
+    "left": {"field": "close"}, "op": "<", "right": {"rolling": "mean", "field": "close", "window": 20}
+  },
+  "stop_rule": {"type": "fixed_pct", "pct": 0.005},
+  "sizing_rule": {"type": "max_affordable", "capital_fraction": 1.0},
+  "no_trade_conditions": [],
+  "execution_assumption": {"entry_fill": "next_candle_open", "exit_fill": "next_candle_open"},
+  "parameters": {"ma_window": 20, "momentum_bars": 2, "stop_pct": 0.005, "vol_window": 20},
+  "tunable_parameters": [],
+  "capital": 5000.0,
+  "max_open_positions": 1,
+  "side": "LONG"
+}
