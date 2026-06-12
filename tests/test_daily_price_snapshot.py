@@ -155,3 +155,26 @@ def test_no_symbol_outside_configured_universe_is_snapshotted(tmp_path):
     assert result.exit_code == 0
     assert requested_symbols == ["RELIANCE"]
     assert [row["symbol"] for row in rows] == ["RELIANCE"]
+
+
+def test_mid_session_price_is_never_stored_as_eod_close(tmp_path):
+    """A quote stamped before 15:30 IST is a live price, not a close; storing
+    it would freeze a non-final number behind the UNIQUE constraint and make
+    the real 18:00 run a no-op."""
+    db_path = tmp_path / "snapshot.db"
+    log_path = tmp_path / "snapshot.log"
+
+    row = _quote_row()
+    row["timestamp"] = "2026-06-11T06:30:00+00:00"  # 12:00 IST, mid-session
+
+    result = snap.snapshot_prices(
+        db_path=db_path,
+        trade_date=TRADE_DATE,
+        symbols=("RELIANCE",),
+        quote_func=lambda symbols: [row],
+        log_path=log_path,
+    )
+
+    assert result.exit_code == 1
+    assert _daily_rows(db_path) == []
+    assert "not closed" in log_path.read_text(encoding="utf-8")

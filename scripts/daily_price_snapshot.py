@@ -119,6 +119,27 @@ def _float_or_none(value) -> float | None:
     return parsed
 
 
+NSE_CLOSE = dtime(15, 30)
+
+
+def _assert_session_closed(quote_timestamp: str, symbol: str) -> None:
+    """Refuse to store an EOD close while the session is still trading.
+
+    A quote stamped before 15:30 IST is a live mid-session price; storing it
+    would freeze a non-final number as that day's close behind the UNIQUE
+    constraint (the 18:00 scheduled run would then be a no-op). Early-close
+    special sessions (e.g. Muhurat) are skipped by this rule — an honest gap
+    beats a wrong close.
+    """
+    parsed = datetime.fromisoformat(str(quote_timestamp)).astimezone(IST)
+    if parsed.time() < NSE_CLOSE:
+        raise ValueError(
+            f"{symbol}: session {parsed.date().isoformat()} not closed at quote "
+            f"time {parsed.time().isoformat(timespec='minutes')} IST; EOD close "
+            "not final, no row written"
+        )
+
+
 def _session_date_from_timestamp(quote_timestamp: str) -> date:
     """IST session date the quote actually belongs to.
 
@@ -150,6 +171,7 @@ def _build_insert_row(row: dict, trade_date: date) -> dict:
     if not source:
         raise ValueError(f"{symbol}: quote source missing")
 
+    _assert_session_closed(quote_timestamp, symbol)
     session_date = _session_date_from_timestamp(quote_timestamp)
     if session_date > trade_date:
         raise ValueError(
