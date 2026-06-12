@@ -345,8 +345,8 @@ function Drawer({ open, activePage, setActivePage, onClose }) {
   };
   return (
     <>
-      <button aria-label="Close menu overlay" className="fixed inset-0 z-40 bg-white/50 backdrop-blur-sm" onClick={onClose} />
-      <aside className="fixed left-0 top-0 z-50 flex h-full w-[260px] flex-col border-r border-[#e5e7eb] bg-white shadow-xl">
+      <button aria-label="Close menu overlay" className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-[2px]" onClick={onClose} />
+      <aside className="fixed left-0 top-0 z-50 flex h-full w-[270px] flex-col border-r border-[#e5e7eb] bg-white shadow-2xl">
         <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4">
           <div>
             <div className="text-[13px] font-semibold text-[#020617]">Trader</div>
@@ -362,7 +362,7 @@ function Drawer({ open, activePage, setActivePage, onClose }) {
               key={name}
               onClick={() => navigate(name)}
               className={`mb-0.5 flex w-full items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium ${
-                activePage === name ? "bg-[#eff6ff] text-[#2563eb]" : "text-[#374151] hover:bg-[#f8fafc]"
+                activePage === name ? "bg-[#eff6ff] text-[#1d4ed8]" : "text-[#111827] hover:bg-[#f1f5f9]"
               }`}
             >
               <Icon className="h-4 w-4 shrink-0" />
@@ -374,7 +374,7 @@ function Drawer({ open, activePage, setActivePage, onClose }) {
           <button
             onClick={() => navigate("Profile")}
             className={`mb-0.5 flex w-full items-center gap-3 rounded-md px-3 py-2 text-[13px] font-medium ${
-              activePage === "Profile" ? "bg-[#eff6ff] text-[#2563eb]" : "text-[#374151] hover:bg-[#f8fafc]"
+              activePage === "Profile" ? "bg-[#eff6ff] text-[#1d4ed8]" : "text-[#111827] hover:bg-[#f1f5f9]"
             }`}
           >
             <UserRound className="h-4 w-4 shrink-0" />
