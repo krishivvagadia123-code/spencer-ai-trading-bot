@@ -1,0 +1,11 @@
+{
+  "functional": 80,
+  "profitability": 4,
+  "composite": 48,
+  "gradedBy": "manager (Claude Code)",
+  "gradedAt": "2026-06-12",
+  "basis": "PROJECT_STATUS.md — scores move only on journaled evidence, never on infrastructure alone",
+  "candidatesTested": 2,
+  "candidatesKilled": 2,
+  "validatedEdges": 0
+}
