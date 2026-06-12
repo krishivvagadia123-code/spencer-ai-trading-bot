@@ -1,65 +1,60 @@
 # Project Status
 
-Status date: 2026-06-03
+Status date: 2026-06-12
 
 ## Summary
 
-Spencer is a private paper-only AI trading research system. It is currently a
-research and workflow platform, not a deployable live trading system.
+Spencer is a private paper-only AI trading research system, now governed by the
+One-Stock Mastery Doctrine (`SPENCER_CONCEPT.md`): one stock (RELIANCE), one open
+position max, exactly ₹5,000 paper capital, zero fake data, mastery before expansion.
+
+## Current Epoch
+
+- Account epoch: `one_stock_reliance_v1` (started 2026-06-11).
+- Basis: ₹5,000.00 — cash ₹5,000, invested ₹0, 0 holdings, 0 orders, 0 closed trades.
+- Prior multi-stock history is preserved in the journal (trades ≤ id 15); the three
+  stale May-27 positions were closed honestly via journaled `ONE_STOCK_RESET` sells.
+- The legacy Node simulation backend has been deleted; the frontend talks only to
+  the real Python quote server (`spencer_quote_server.py`, port 8787).
 
 ## Current Score
 
-Approximate Spencer score: 48/100.
-
-Reason: multiple research cycles improved infrastructure and safety, but no feature has
-yet produced a validated, cost-clearing, walk-forward-surviving edge. Infrastructure
-robustness does not raise the score by itself.
+Approximate Spencer score: 48/100. Infrastructure and honesty are strong; no
+validated, cost-clearing edge exists yet. The score moves only when journaled
+paper results clear costs consistently.
 
 ## Safety State
 
-- Paper-only: true.
-- Deployment allowed: false.
-- Deployment blocked: true.
-- Live trading allowed: false.
-- Broker execution allowed: false.
-- AI order approval allowed: false.
-- Fake dashboard data allowed: false.
+- Paper-only: true. Live trading: disabled. Broker execution: disabled.
+- AI order approval: disabled. Deployment blocked: true (`workflow/deployment_gate.json`).
+- Fake dashboard data: forbidden and removed at the root (simulator deleted).
 
-Current gate source: `workflow/deployment_gate.json`.
+## Team / Workflow
 
-## Current Research Findings
+- Claude Code: manager/orchestrator — task specs, reviews, audits, git, verification.
+- Codex: engineer — implements one task spec at a time, commits locally, never pushes.
+- ChatGPT: document drafter. Antigravity: frontend design. Perplexity: web research.
+- Git is the sync point; every reviewed change is committed and pushed to
+  https://github.com/krishivvagadia123-code/spencer-ai-trading-bot
 
-- Delivery-volume research: failed as a signal. Data coverage was good, but ICs did not
-  show stable OOS predictive power and cost-clearing walk-forward survival.
-- Bulk/block-deal research: data-access path exists, but the edge remains untestable
-  without enough historical manual NSE CSVs.
-- FII/DII flows: official NSE endpoint produced only the current provisional day, so the
-  result is DATA_UNAVAILABLE until enough real historical rows are accumulated or supplied.
-- Gap-up/event work: no strategy spec is allowed until confirmation gates pass.
+## Research Findings So Far
 
-## Known Limitations
+- Delivery-volume signal: tested and killed (no stable OOS power).
+- Bulk/block deals, FII/DII flows: untestable on free endpoints (no history).
+- GDELT news: DOC API is ~3-month recent-only; GKG scoping task queued.
+- RELIANCE cost math (2026-06-12, `docs/RELIANCE_COST_MATH.md`): intraday
+  round-trip breakeven ≈ 0.106% vs median daily range 1.70% — costs are clearable
+  intraday; delivery at 1 share needs 1.48% and is structurally near-unplayable.
 
-- No validated alpha source yet.
-- Some free NSE event/flow endpoints are current-day-only or bot-protected.
-- Manual historical CSVs may be required for block-deal or FII/DII retests.
-- Research modules are read-only and must not create strategy deployment code.
-- Pre-existing test debt is documented in `AUDIT_REPORT.md`.
+## In Flight
+
+- Codex: `workflow/tasks/daily_price_snapshot.md` — daily automatic RELIANCE EOD
+  price snapshot via Windows Task Scheduler (append-only, honest failure states).
+- ChatGPT: `MASTERY_LEDGER.md` daily review template.
 
 ## Next Tasks
 
-- Keep deployment blocked until a research module passes validation.
-- Record and triage `workflow/tasks/record_flows_eval_rejection.md`.
-- Optionally supply historical NSE bulk/block CSVs under `data/block_deals/` for retesting.
-- Continue the next historically deep data-source research track from
-  `DATA_SOURCE_RESEARCH_PLAN.md`.
-- Keep `AUDIT_REPORT.md` updated after every research cycle.
-
-## Files That Should Remain Included
-
-- `workflow/tasks/`
-- `AUDIT_REPORT.md`
-- `DATA_SOURCE_RESEARCH_PLAN.md`
-- `.github/ISSUE_TEMPLATE/`
-- `workflow/research_automation.py`
-- `workflow/pipeline.py`
-- `workflow/agents/`
+- Review + land the daily snapshot; register the scheduled task with the operator.
+- Begin RELIANCE mastery research: candidate intraday techniques evaluated against
+  the cost bar (edge per trade ≥ ~3× round-trip cost), walk-forward, journaled.
+- Keep deployment blocked until validation passes; keep `AUDIT_REPORT.md` current.
