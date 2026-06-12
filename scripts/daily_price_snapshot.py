@@ -119,6 +119,19 @@ def _float_or_none(value) -> float | None:
     return parsed
 
 
+def _session_date_from_timestamp(quote_timestamp: str) -> date:
+    """IST session date the quote actually belongs to.
+
+    The row must be labelled with the quote's own session, not the run date:
+    a run before market close would otherwise file yesterday's close under
+    today's date — a mislabelled (i.e. fake-looking) data point.
+    """
+    parsed = datetime.fromisoformat(str(quote_timestamp))
+    if parsed.tzinfo is None:
+        raise ValueError(f"quote timestamp missing timezone: {quote_timestamp}")
+    return parsed.astimezone(IST).date()
+
+
 def _build_insert_row(row: dict, trade_date: date) -> dict:
     symbol = str(row.get("symbol") or "").strip().upper()
     price = _float_or_none(row.get("price"))
@@ -137,13 +150,30 @@ def _build_insert_row(row: dict, trade_date: date) -> dict:
     if not source:
         raise ValueError(f"{symbol}: quote source missing")
 
+    session_date = _session_date_from_timestamp(quote_timestamp)
+    if session_date > trade_date:
+        raise ValueError(
+            f"{symbol}: quote session {session_date.isoformat()} is after "
+            f"requested trade date {trade_date.isoformat()}"
+        )
+    if session_date == trade_date:
+        prev = _float_or_none(row.get("previousClose"))
+        change = _float_or_none(row.get("changePct"))
+    else:
+        # The quote belongs to an earlier session (e.g. run before today's
+        # close). previousClose/changePct in the live payload are relative to
+        # fetch time, not to that session — record the close under its true
+        # session date and leave the rest honestly NULL.
+        prev = None
+        change = None
+
     market_state = str(row.get("marketState") or row.get("status") or "UNKNOWN").upper()
     return {
         "symbol": symbol,
-        "trade_date": trade_date.isoformat(),
+        "trade_date": session_date.isoformat(),
         "close": round(price, 2),
-        "prev_close": _float_or_none(row.get("previousClose")),
-        "change_pct": _float_or_none(row.get("changePct")),
+        "prev_close": prev,
+        "change_pct": change,
         "quote_timestamp": str(quote_timestamp),
         "fetched_at": str(fetched_at),
         "source": str(source),
@@ -226,7 +256,7 @@ def snapshot_prices(
         ensure_daily_prices_table(conn)
         inserted_rows = []
         for row in insert_rows:
-            if _row_exists(conn, row["symbol"], trade_day):
+            if _row_exists(conn, row["symbol"], date.fromisoformat(row["trade_date"])):
                 continue
             _insert_daily_price(conn, row)
             inserted_rows.append(row)

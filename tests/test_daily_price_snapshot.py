@@ -109,6 +109,32 @@ def test_api_failure_writes_no_row_and_exits_nonzero(tmp_path):
     assert "quote API down" in log_path.read_text(encoding="utf-8")
 
 
+def test_stale_quote_is_filed_under_its_own_session_date(tmp_path):
+    """A run before today's close must not label yesterday's close as today.
+
+    The quote timestamp (2026-06-11 15:30 IST) decides the trade_date even when
+    the snapshot is requested for 2026-06-12, and the payload's fetch-relative
+    previousClose/changePct are dropped (NULL) for the back-dated session.
+    """
+    db_path = tmp_path / "snapshot.db"
+    log_path = tmp_path / "snapshot.log"
+
+    result = snap.snapshot_prices(
+        db_path=db_path,
+        trade_date=date(2026, 6, 12),
+        symbols=("RELIANCE",),
+        quote_func=lambda symbols: [_quote_row(symbols[0])],
+        log_path=log_path,
+    )
+
+    rows = _daily_rows(db_path)
+    assert result.exit_code == 0
+    assert len(rows) == 1
+    assert rows[0]["trade_date"] == "2026-06-11"
+    assert rows[0]["prev_close"] is None
+    assert rows[0]["change_pct"] is None
+
+
 def test_no_symbol_outside_configured_universe_is_snapshotted(tmp_path):
     db_path = tmp_path / "snapshot.db"
     log_path = tmp_path / "snapshot.log"
