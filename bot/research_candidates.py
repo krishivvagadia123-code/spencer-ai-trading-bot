@@ -20,6 +20,13 @@ EXECUTION_ASSUMPTION = {
     "entry_fill": "next_candle_open",
     "exit_fill": "next_candle_open",
 }
+ALLOWED_CONTEXT_FIELDS = frozenset({
+    "prev_session_range_pct",
+    "prev_session_close",
+    "gap_pct",
+    "session_minute",
+    "is_expiry_session",
+})
 FORBIDDEN_RULE_KEYS = {
     "callback",
     "callable",
@@ -98,6 +105,10 @@ def _validate_no_future_references(rule: Any, path: str = "rule") -> None:
                 raise ValueError(f"{path} references forbidden future/callback key: {key}")
             if isinstance(raw_value, str) and "future" in raw_value.lower():
                 raise ValueError(f"{path} references future data: {raw_value}")
+            if key_l == "context":
+                context_name = str(raw_value)
+                if context_name not in ALLOWED_CONTEXT_FIELDS:
+                    raise ValueError(f"{path} references unknown context field: {context_name}")
             if key_l in {"offset", "periods", "shift"}:
                 try:
                     amount = int(raw_value)

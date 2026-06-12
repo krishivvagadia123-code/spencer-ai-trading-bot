@@ -1,15 +1,21 @@
 """Synthetic-candle tests for the candidate-agnostic intraday harness."""
 
-from datetime import datetime
+from datetime import date, datetime
 import sqlite3
+import math
 
 import pytest
 
+from bot.holidays import DEFAULT_REGISTRY
 from bot.intraday_backtest import (
     BacktestResult,
+    Candle,
     assert_not_forbidden_by_kill_registry,
+    evaluate_rule,
     record_kill,
     run_backtest,
+    _contextualize_candles,
+    _is_monthly_expiry_session,
 )
 from bot.market_data import IST
 from bot.research_candidates import candidate_from_dict
@@ -92,6 +98,20 @@ def _ts(day: int, hh: int, mm: int) -> str:
     return datetime(2026, 6, day, hh, mm, tzinfo=IST).isoformat()
 
 
+def _candle(day: int, hh: int, mm: int, open_: float, high: float, low: float, close: float) -> Candle:
+    return Candle(
+        symbol="RELIANCE",
+        interval="15m",
+        ts=datetime(2026, 6, day, hh, mm, tzinfo=IST),
+        open=open_,
+        high=high,
+        low=low,
+        close=close,
+        volume=1000.0,
+        source="synthetic unit test candles",
+    )
+
+
 def _basic_rows():
     return [
         {"ts": _ts(11, 9, 15), "open": 100, "high": 103, "low": 99, "close": 101},
@@ -103,12 +123,87 @@ def _basic_rows():
 def test_candidate_validation_rejects_future_references_and_bad_shape():
     with pytest.raises(ValueError, match="future"):
         _candidate(entry_rule={"left": {"future": "close"}, "op": ">", "right": {"value": 1}})
+    with pytest.raises(ValueError, match="unknown context"):
+        _candidate(entry_rule={"left": {"context": "prev_session_typo"}, "op": ">", "right": {"value": 1}})
+    _candidate(entry_rule={"left": {"context": "session_minute"}, "op": ">=", "right": {"value": 0}})
     with pytest.raises(ValueError, match="RELIANCE"):
         _candidate(symbol="TCS")
     with pytest.raises(ValueError, match="capital"):
         _candidate(capital=10_000.0)
     with pytest.raises(ValueError, match="max_open_positions"):
         _candidate(max_open_positions=2)
+
+
+def test_context_prev_session_range_gap_and_first_session_nan():
+    candles = _contextualize_candles([
+        _candle(10, 9, 15, 100, 110, 95, 105),
+        _candle(10, 15, 15, 108, 115, 100, 110),
+        _candle(11, 9, 15, 121, 123, 119, 122),
+        _candle(11, 9, 30, 124, 126, 120, 125),
+    ])
+
+    assert math.isnan(candles[0].context["prev_session_range_pct"])
+    assert math.isnan(candles[0].context["prev_session_close"])
+    assert math.isnan(candles[0].context["gap_pct"])
+    assert evaluate_rule(
+        {"left": {"context": "prev_session_range_pct"}, "op": ">", "right": {"value": 0}},
+        [candles[0]],
+        {},
+    ) is False
+
+    expected_range = (115 - 95) / 110 * 100
+    expected_gap = (121 - 110) / 110 * 100
+    assert candles[2].context["prev_session_close"] == 110
+    assert candles[2].context["prev_session_range_pct"] == pytest.approx(expected_range)
+    assert candles[2].context["gap_pct"] == pytest.approx(expected_gap)
+    assert candles[3].context["prev_session_range_pct"] == pytest.approx(expected_range)
+    assert candles[3].context["gap_pct"] == pytest.approx(expected_gap)
+
+    assert evaluate_rule(
+        {"left": {"context": "session_minute", "field": "close"}, "op": "==", "right": {"value": 0}},
+        [candles[0]],
+        {},
+    ) is True
+
+
+def test_context_session_minute_for_intraday_candles():
+    candles = _contextualize_candles([
+        _candle(11, 9, 15, 100, 101, 99, 100),
+        _candle(11, 15, 15, 110, 111, 109, 110),
+    ])
+
+    assert candles[0].context["session_minute"] == 0
+    assert candles[1].context["session_minute"] == 360
+
+
+def test_context_monthly_expiry_and_holiday_shift():
+    # 2026-06-25 is the last Thursday of June 2026. If that session is a
+    # registered NSE holiday, the expiry session shifts to the prior trading day.
+    assert _is_monthly_expiry_session(date(2026, 6, 25)) is True
+    assert _is_monthly_expiry_session(date(2026, 6, 24)) is False
+
+    snapshot = DEFAULT_REGISTRY.snapshot()
+    try:
+        DEFAULT_REGISTRY.add(date(2026, 6, 25))
+        assert _is_monthly_expiry_session(date(2026, 6, 25)) is False
+        assert _is_monthly_expiry_session(date(2026, 6, 24)) is True
+    finally:
+        DEFAULT_REGISTRY.restore(snapshot)
+
+
+def test_context_has_no_lookahead_after_current_candle():
+    candles = [
+        _candle(10, 9, 15, 100, 110, 95, 105),
+        _candle(10, 15, 15, 108, 115, 100, 110),
+        _candle(11, 9, 15, 121, 123, 119, 122),
+        _candle(11, 9, 30, 124, 140, 118, 125),
+        _candle(12, 9, 15, 130, 132, 128, 131),
+    ]
+
+    full_context = _contextualize_candles(candles)[2].context
+    truncated_context = _contextualize_candles(candles[:3])[2].context
+
+    assert full_context == truncated_context
 
 
 def test_engine_fills_at_next_open_with_charges_and_slippage(tmp_path):
@@ -151,6 +246,7 @@ def test_reproducibility_and_cost_bar_math_are_stable(tmp_path):
     second = run_backtest(cand, db_path=db_path, persist=False)
 
     assert first.result_hash == second.result_hash
+    assert first.result_hash == "cda5c9a1f212e461b288b358307919d89f288b9a15f610978ff4f0b79bf85308"
     assert first.summary == second.summary
     assert first.summary["cost_bar_pass"] is True
     assert first.summary["net_edge_per_trade_pct_of_notional"] >= first.summary["cost_bar_required_pct"]

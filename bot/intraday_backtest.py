@@ -11,15 +11,17 @@ import hashlib
 import json
 import math
 import sqlite3
-from dataclasses import dataclass
-from datetime import date, datetime
+from dataclasses import dataclass, field, replace
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Sequence
 
 from bot.config import default_config
 from bot.execution_sim import simulate_fill
+from bot.holidays import is_nse_holiday
 from bot.market_data import IST, Quote
 from bot.research_candidates import (
+    ALLOWED_CONTEXT_FIELDS,
     CAPITAL_BASIS_INR,
     ResearchCandidate,
     candidate_hash,
@@ -73,6 +75,7 @@ class Candle:
     close: float
     volume: float
     source: str = ""
+    context: dict[str, float] = field(default_factory=dict, compare=False, repr=False)
 
     @property
     def session_date(self) -> date:
@@ -170,6 +173,92 @@ def load_candles(
     return candles
 
 
+SESSION_START_HOUR = 9
+SESSION_START_MINUTE = 15
+
+
+def _session_minute(ts: datetime) -> float:
+    local_ts = ts.astimezone(IST)
+    session_open = local_ts.replace(
+        hour=SESSION_START_HOUR,
+        minute=SESSION_START_MINUTE,
+        second=0,
+        microsecond=0,
+    )
+    return (local_ts - session_open).total_seconds() / 60.0
+
+
+def _last_thursday(year: int, month: int) -> date:
+    if month == 12:
+        cursor = date(year + 1, 1, 1) - timedelta(days=1)
+    else:
+        cursor = date(year, month + 1, 1) - timedelta(days=1)
+    while cursor.weekday() != 3:
+        cursor -= timedelta(days=1)
+    return cursor
+
+
+def _is_trading_day(session: date) -> bool:
+    return session.weekday() < 5 and not is_nse_holiday(session)
+
+
+def _monthly_expiry_session(year: int, month: int) -> date:
+    """NSE monthly F&O expiry is the last Thursday, shifted to the prior
+    trading day when that Thursday is a registered exchange holiday."""
+    expiry = _last_thursday(year, month)
+    while not _is_trading_day(expiry):
+        expiry -= timedelta(days=1)
+    return expiry
+
+
+def _is_monthly_expiry_session(session: date) -> bool:
+    return session == _monthly_expiry_session(session.year, session.month)
+
+
+def _nan_context() -> dict[str, float]:
+    return {name: float("nan") for name in ALLOWED_CONTEXT_FIELDS}
+
+
+def _contextualize_candles(candles: Sequence[Candle]) -> list[Candle]:
+    enriched: list[Candle] = []
+    current_session: date | None = None
+    current_stats: dict[str, float] | None = None
+    previous_stats: dict[str, float] | None = None
+    session_base_context = _nan_context()
+
+    for candle in candles:
+        session = candle.session_date
+        if session != current_session:
+            if current_stats is not None:
+                previous_stats = current_stats
+            current_session = session
+            current_stats = {
+                "high": float(candle.high),
+                "low": float(candle.low),
+                "close": float(candle.close),
+            }
+            session_base_context = _nan_context()
+            if previous_stats is not None and previous_stats["close"] != 0:
+                prev_close = previous_stats["close"]
+                session_base_context["prev_session_close"] = prev_close
+                session_base_context["prev_session_range_pct"] = (
+                    (previous_stats["high"] - previous_stats["low"]) / prev_close * 100.0
+                )
+                session_base_context["gap_pct"] = (float(candle.open) - prev_close) / prev_close * 100.0
+            session_base_context["is_expiry_session"] = 1.0 if _is_monthly_expiry_session(session) else 0.0
+
+        context = dict(session_base_context)
+        context["session_minute"] = _session_minute(candle.ts)
+        enriched.append(replace(candle, context=context))
+
+        if current_stats is not None:
+            current_stats["high"] = max(current_stats["high"], float(candle.high))
+            current_stats["low"] = min(current_stats["low"], float(candle.low))
+            current_stats["close"] = float(candle.close)
+
+    return enriched
+
+
 def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float | bool:
     if isinstance(spec, (int, float, bool)):
         return spec
@@ -190,6 +279,11 @@ def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float 
         # too, and falling into the field branch silently turns e.g.
         # "close > rolling mean(close)" into "close > close" (never true).
         return _rolling_value(spec, history)
+    if "context" in spec:
+        # Resolution order is explicit: context sits before generic field
+        # handling, while rolling remains before both because rolling operands
+        # also carry a field key.
+        return _context_value(spec, history)
     if "field" in spec:
         return getattr(history[-1], str(spec["field"]))
     if "lag" in spec:
@@ -201,6 +295,14 @@ def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float 
             return float("nan")
         return getattr(history[idx], str(spec["lag"]))
     raise ValueError(f"unknown operand: {spec!r}")
+
+
+def _context_value(spec: dict, history: Sequence[Candle]) -> float:
+    name = str(spec["context"])
+    if name not in ALLOWED_CONTEXT_FIELDS:
+        raise ValueError(f"unknown context field: {name}")
+    value = history[-1].context.get(name, float("nan"))
+    return float(value) if value is not None else float("nan")
 
 
 def _rolling_value(spec: dict, history: Sequence[Candle]) -> float:
@@ -405,7 +507,7 @@ def replay_candidate(
     stop_rule = rule_to_dict(candidate.stop_rule)
     sizing_rule = rule_to_dict(candidate.sizing_rule)
     no_trade_rules = [rule_to_dict(rule) for rule in candidate.no_trade_conditions]
-    candles = list(candles)
+    candles = _contextualize_candles(list(candles))
     if len(candles) < 2:
         dataset = _dataset(candles)
         payload = {
