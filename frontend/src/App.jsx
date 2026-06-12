@@ -38,6 +38,7 @@ const PAGES = [
   ["Funds", CircleDollarSign],
   ["Bids", ClipboardList],
   ["Brain", Brain],
+  ["Research", BarChart3],
   ["Governance", ShieldCheck],
   ["Trade Tracker", PieChart],
 ];
@@ -690,6 +691,7 @@ function DashboardPage({ botState, backendStatus, selectedStock, openAddWidget, 
     return (
       <div className="space-y-4">
         <PortfolioOverview botState={botState} backendStatus={backendStatus} watchlistCount={watchlistCount} />
+        <ResearchLedgerPanel />
         <BrainWidget selectedStock={selectedStock} />
         <TrustWidget backendStatus={backendStatus} botHealth={botHealth} quoteHealth={quoteHealth} selectedStock={selectedStock} />
       </div>
@@ -698,6 +700,7 @@ function DashboardPage({ botState, backendStatus, selectedStock, openAddWidget, 
   return (
     <div className="space-y-4">
       <PortfolioOverview botState={botState} backendStatus={backendStatus} watchlistCount={watchlistCount} />
+      <ResearchLedgerPanel />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
         <CapitalGuardWidget botState={botState} />
         <StrategyWidget botState={botState} backendStatus={backendStatus} />
@@ -851,6 +854,10 @@ function BidsPage({ botState, backendStatus }) {
 function BrainPage({ selectedStock }) {
   const research = useResearch(selectedStock);
   return <ResearchPanel selectedStock={selectedStock} {...research} />;
+}
+
+function ResearchPage() {
+  return <ResearchLedgerPanel />;
 }
 
 function TradeTrackerPage({ botState, backendStatus, onTradeClick }) {
@@ -1177,6 +1184,41 @@ function useResearch(selectedStock) {
   return { row, status, health, loadResearch };
 }
 
+function useResearchLedger() {
+  const [ledger, setLedger] = useState(null);
+  const [status, setStatus] = useState("loading");
+  const [health, setHealth] = useState({ status: "loading", lastSuccess: null, lastError: null });
+  const loadLedger = useCallback(async () => {
+    setStatus((previous) => (previous === "ready" ? "refreshing" : "loading"));
+    setHealth((previous) => ({ ...previous, status: "loading" }));
+    try {
+      const res = await fetch(`${SPENCER_API_BASE}/api/research/ledger`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Research ledger API returned an error");
+      const json = await res.json();
+      if (!json?.ok) throw new Error("Research ledger API returned ok=false");
+      setLedger(json);
+      const hasCandidates = asArray(json.candidates).length > 0;
+      setStatus(hasCandidates ? "ready" : "empty");
+      setHealth({
+        status: hasCandidates ? "ready" : "empty",
+        lastSuccess: timeLabel(),
+        lastError: hasCandidates ? null : "Research ledger returned no candidates",
+      });
+    } catch (error) {
+      setStatus("error");
+      setHealth({
+        status: "error",
+        lastSuccess: null,
+        lastError: error?.message || "Research ledger API request failed",
+      });
+    }
+  }, []);
+  useEffect(() => {
+    loadLedger();
+  }, [loadLedger]);
+  return { ledger, status, health, loadLedger };
+}
+
 function researchStatusText(status) {
   if (status === "loading") return "Checking Spencer research engine...";
   if (status === "empty") return "No research metrics available from backend.";
@@ -1193,6 +1235,182 @@ function researchMetrics(row) {
     ["Return 20d", isMissing(row?.return20d) ? "N/A" : `${(Number(row.return20d) * 100).toFixed(1)}%`],
     ["Avg Volume 20d", isMissing(row?.avgVolume20d) ? "N/A" : Number(row.avgVolume20d).toLocaleString("en-IN", { maximumFractionDigits: 0 })],
   ];
+}
+
+const apiCount = (value) =>
+  isMissing(value) ? "N/A" : Number(value).toLocaleString("en-IN", { maximumFractionDigits: 0 });
+const apiMoney = (value) => (isMissing(value) ? "N/A" : money(value, 2));
+const apiPct = (value) => (isMissing(value) ? "N/A" : pct(value, 3));
+const apiText = (value) => (value === null || value === undefined || value === "" ? "N/A" : String(value));
+const verdictClass = (status) => {
+  const text = String(status || "").toUpperCase();
+  if (text === "KILLED") return "border-red-200 bg-red-50 text-red-700";
+  if (text === "PASSED") return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-amber-200 bg-amber-50 text-amber-700";
+};
+const stageRange = (stage) => {
+  const dataset = stage?.dataset || {};
+  const start = dataset.start ? String(dataset.start) : null;
+  const end = dataset.end ? String(dataset.end) : null;
+  if (start && end) return `${start} to ${end}`;
+  return start || end || "N/A";
+};
+
+function ResearchLedgerPanel() {
+  const { ledger, status, health, loadLedger } = useResearchLedger();
+  const candidates = asArray(ledger?.candidates);
+  const scoreboard = ledger?.scoreboard || {};
+  const coverage = ledger?.dataCoverage || {};
+  const intraday = asArray(coverage.intraday);
+  const scoreItems = [
+    ["Functional", scoreboard.functional],
+    ["Profitability", scoreboard.profitability],
+    ["Composite", scoreboard.composite],
+    ["Candidates tested", scoreboard.candidatesTested],
+    ["Candidates killed", scoreboard.candidatesKilled],
+    ["Validated edges", scoreboard.validatedEdges],
+  ].filter(([, value]) => !isMissing(value));
+
+  return (
+    <section className="research-ledger-panel rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm" aria-labelledby="research-ledger-title" data-research-ledger-panel>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">Research Ledger</div>
+          <h2 id="research-ledger-title" className="mt-1 text-[18px] font-semibold text-[#020617]">Tested candidates and verdicts</h2>
+          {scoreboard.updatedAt && (
+            <div className="mt-1 text-[11px] text-[#64748b]">Scoreboard updated {scoreboard.updatedAt}</div>
+          )}
+        </div>
+        <button onClick={loadLedger} disabled={status === "loading"} className="flex items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-[#1d4ed8] disabled:cursor-wait disabled:opacity-70">
+          {status === "loading" ? "Checking" : "Refresh"}
+        </button>
+      </div>
+
+      {status === "loading" && (
+        <div className="research-ledger-loading mt-4 rounded-lg border border-blue-100 bg-[#eff6ff] px-4 py-3 text-[12px] text-[#2563eb]">Checking research ledger.</div>
+      )}
+
+      {status === "error" && (
+        <div className="research-ledger-error mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-[12px] text-red-700">
+          Research ledger unavailable. {health.lastError ? apiText(health.lastError) : ""}
+        </div>
+      )}
+
+      {status !== "loading" && status !== "error" && candidates.length === 0 && (
+        <div className="research-ledger-empty mt-4 rounded-lg border border-gray-200 bg-[#f8fafc] px-4 py-6 text-center text-[13px] font-semibold text-[#475569]">No candidates tested yet.</div>
+      )}
+
+      {status !== "loading" && status !== "error" && (
+        <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="research-ledger-candidates space-y-3">
+            {candidates.map((candidate) => (
+              <article key={`${candidate.candidateId}-${candidate.version}`} className="research-ledger-candidate rounded-lg border border-gray-200 bg-[#f8fafc] p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-[15px] font-semibold text-[#020617]">{apiText(candidate.candidateId)}</h3>
+                      <span className="rounded border border-gray-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-[#64748b]">v{apiText(candidate.version)}</span>
+                      <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${verdictClass(candidate.status)}`}>{apiText(candidate.status)}</span>
+                    </div>
+                    {candidate.kill?.date && (
+                      <div className="mt-1 text-[11px] font-medium text-red-700">Killed {candidate.kill.date}</div>
+                    )}
+                  </div>
+                  {candidate.kill?.reason && (
+                    <div className="max-w-xs rounded-md border border-red-100 bg-white px-3 py-2 text-[11px] font-medium text-red-700">{candidate.kill.reason}</div>
+                  )}
+                </div>
+
+                <details className="research-ledger-hypothesis mt-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-[12px] text-[#475569]">
+                  <summary className="cursor-pointer truncate font-medium text-[#020617]">{apiText(candidate.hypothesis)}</summary>
+                  <p className="mt-2 leading-5">{apiText(candidate.hypothesis)}</p>
+                </details>
+
+                {asArray(candidate.stages).length === 0 ? (
+                  <div className="mt-3 rounded-md border border-gray-200 bg-white px-3 py-2 text-[12px] text-[#64748b]">No stage rows recorded.</div>
+                ) : (
+                  <div className="research-ledger-stage-table mt-3 overflow-x-auto rounded-md border border-gray-200 bg-white">
+                    <table className="min-w-full text-left text-[12px]">
+                      <thead className="bg-gray-50 text-[10px] uppercase tracking-wider text-[#64748b]">
+                        <tr>
+                          <th className="px-3 py-2">Stage</th>
+                          <th className="px-3 py-2">Status</th>
+                          <th className="px-3 py-2 text-right">Trades</th>
+                          <th className="px-3 py-2 text-right">Gross</th>
+                          <th className="px-3 py-2 text-right">Costs</th>
+                          <th className="px-3 py-2 text-right">Net</th>
+                          <th className="px-3 py-2 text-right">Edge</th>
+                          <th className="px-3 py-2 text-right">Bar</th>
+                          <th className="px-3 py-2">Dataset</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {asArray(candidate.stages).map((stage, index) => (
+                          <tr key={`${stage.stage}-${index}`} className="text-[#334155]">
+                            <td className="whitespace-nowrap px-3 py-2 font-semibold">{apiText(stage.stage)}</td>
+                            <td className="whitespace-nowrap px-3 py-2">{apiText(stage.status)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">{apiCount(stage.trades)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">{apiMoney(stage.gross_pnl)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">{apiMoney(stage.total_costs)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right font-semibold">{apiMoney(stage.net_pnl)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">{apiPct(stage.net_edge_pct)}</td>
+                            <td className="whitespace-nowrap px-3 py-2 text-right">{apiPct(stage.cost_bar_required_pct)}</td>
+                            <td className="min-w-[260px] px-3 py-2 text-[11px] text-[#64748b]">{stageRange(stage)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+
+          <aside className="space-y-3">
+            <section className="research-ledger-scoreboard rounded-lg border border-gray-200 bg-[#f8fafc] p-4">
+              <div className="text-[12px] font-semibold text-[#020617]">Scoreboard</div>
+              {scoreItems.length === 0 ? (
+                <div className="mt-3 text-[12px] text-[#64748b]">Scoreboard unavailable from API.</div>
+              ) : (
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {scoreItems.map(([label, value]) => (
+                    <div key={label} className="rounded-md border border-gray-200 bg-white px-3 py-2">
+                      <div className="text-[10px] uppercase tracking-wider text-[#94a3b8]">{label}</div>
+                      <div className="mt-1 text-[16px] font-semibold text-[#020617]">{apiCount(value)}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {scoreboard.basis && <div className="mt-3 text-[11px] leading-5 text-[#64748b]">{scoreboard.basis}</div>}
+            </section>
+
+            <section className="research-ledger-coverage rounded-lg border border-gray-200 bg-[#f8fafc] p-4">
+              <div className="text-[12px] font-semibold text-[#020617]">Data Coverage</div>
+              <div className="mt-3 space-y-2 text-[12px] text-[#334155]">
+                {intraday.length === 0 ? (
+                  <div className="rounded-md border border-gray-200 bg-white px-3 py-2 text-[#64748b]">No intraday coverage rows recorded.</div>
+                ) : (
+                  intraday.map((row) => (
+                    <div key={row.interval} className="rounded-md border border-gray-200 bg-white px-3 py-2">
+                      <div className="font-semibold">{apiText(row.interval)}: {apiCount(row.sessions)} sessions, growing daily</div>
+                      <div className="mt-1 text-[11px] text-[#64748b]">{apiCount(row.candles)} candles</div>
+                      <div className="mt-1 text-[11px] text-[#64748b]">{apiText(row.firstTs)} to {apiText(row.lastTs)}</div>
+                    </div>
+                  ))
+                )}
+                {coverage.daily?.lastTradeDate && (
+                  <div className="rounded-md border border-gray-200 bg-white px-3 py-2">
+                    <div className="font-semibold">Daily close last stored</div>
+                    <div className="mt-1 text-[11px] text-[#64748b]">{coverage.daily.lastTradeDate}</div>
+                  </div>
+                )}
+              </div>
+            </section>
+          </aside>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function ResearchPanel({ selectedStock, row, status, loadResearch }) {
@@ -1346,6 +1564,7 @@ export default function App() {
     if (activePage === "Funds") return <FundsPage botState={botState} backendStatus={backendStatus} profile={profile} />;
     if (activePage === "Bids") return <BidsPage botState={botState} backendStatus={backendStatus} />;
     if (activePage === "Brain") return <BrainPage selectedStock={selectedStock} />;
+    if (activePage === "Research") return <ResearchPage />;
     if (activePage === "Governance") return <GovernancePage botState={botState} backendStatus={backendStatus} />;
     if (activePage === "Trade Tracker") return <TradeTrackerPage botState={botState} backendStatus={backendStatus} onTradeClick={setSelectedTrade} />;
     if (activePage === "Profile") return <ProfilePage profile={profile} setProfile={setProfile} />;
@@ -1375,6 +1594,7 @@ export default function App() {
               <div className="text-[18px] font-semibold tracking-tight text-[#020617]">{activePage}</div>
               {activePage === "Dashboard" && <div className="text-[12px] text-[#64748b]">Backend-owned paper dashboard</div>}
               {activePage === "Brain" && <div className="text-[12px] text-[#64748b]">Analysing <span className="font-semibold text-gray-700">{selectedStock}</span></div>}
+              {activePage === "Research" && <div className="text-[12px] text-[#64748b]">Journaled candidate verdicts and coverage</div>}
               {activePage === "Governance" && <div className="text-[12px] text-[#64748b]">Backend-owned tool boundaries and action permissions</div>}
             </div>
             {activePage === "Dashboard" && (

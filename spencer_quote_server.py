@@ -345,6 +345,7 @@ def _handoff_payload() -> dict:
             "quotes": "/api/quotes?symbols=RELIANCE",
             "chart": "/api/chart?symbol=RELIANCE&interval=5m",
             "research": "/api/research?symbols=RELIANCE",
+            "researchLedger": "GET /api/research/ledger",
             "botStart": "POST /api/bot/start",
             "botStatus": "GET /api/bot/status",
             "governance": "GET /api/governance",
@@ -478,6 +479,7 @@ WORKFLOW_STATUS_DIR = WORKFLOW_TASKS_DIR / ".status"
 WORKFLOW_LOGS_DIR = WORKFLOW_DIR / "logs"
 WORKFLOW_DEPLOYMENT_GATE_PATH = WORKFLOW_DIR / "deployment_gate.json"
 WORKFLOW_AGENT_POLICY_PATH = WORKFLOW_DIR / "agents" / "agent_policy.json"
+WORKFLOW_SCOREBOARD_PATH = WORKFLOW_DIR / "scoreboard.json"
 
 
 def _state_json(conn: sqlite3.Connection, key: str, default=None):
@@ -593,6 +595,216 @@ def _load_json_file(path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _parse_json_object(raw):
+    if isinstance(raw, dict):
+        return raw
+    if not raw:
+        return {}
+    try:
+        payload = json.loads(raw)
+    except Exception:
+        return {}
+    return payload if isinstance(payload, dict) else {}
+
+
+def _summary_number(summary: dict, *keys: str):
+    for key in keys:
+        if key in summary:
+            return summary.get(key)
+    return None
+
+
+def _candidate_hypothesis(candidate_json: dict):
+    hypothesis = candidate_json.get("hypothesis")
+    if isinstance(hypothesis, str):
+        return hypothesis
+    return None
+
+
+def _run_stage_payload(row: dict) -> dict:
+    summary = _parse_json_object(row.get("summary_json"))
+    return {
+        "stage": row.get("stage"),
+        "status": row.get("status"),
+        "trades": _summary_number(summary, "trades"),
+        "gross_pnl": _summary_number(summary, "gross_pnl"),
+        "total_costs": _summary_number(summary, "total_costs"),
+        "net_pnl": _summary_number(summary, "net_pnl"),
+        "net_edge_pct": _summary_number(summary, "net_edge_per_trade_pct_of_notional", "net_edge_pct"),
+        "cost_bar_required_pct": _summary_number(summary, "cost_bar_required_pct"),
+        "dataset": {
+            "start": row.get("dataset_start"),
+            "end": row.get("dataset_end"),
+            "rows": row.get("data_rows"),
+        },
+    }
+
+
+def _candidate_status(stages: list[dict], kill: dict | None) -> str:
+    if kill:
+        return "KILLED"
+    if any(stage.get("stage") == "WALK_FORWARD" and stage.get("status") == "PASS" for stage in stages):
+        return "PASSED"
+    return "IN_PROGRESS"
+
+
+def _query_rows(conn: sqlite3.Connection, sql: str, params: tuple = ()) -> list[dict]:
+    try:
+        rows = conn.execute(sql, params).fetchall()
+    except sqlite3.Error:
+        return []
+    return [dict(row) for row in rows]
+
+
+def _research_candidates(conn: sqlite3.Connection) -> list[dict]:
+    run_rows = _query_rows(
+        conn,
+        """
+        SELECT
+            id,
+            stage,
+            candidate_id,
+            candidate_version,
+            params_hash,
+            status,
+            dataset_start,
+            dataset_end,
+            data_rows,
+            summary_json,
+            result_hash,
+            candidate_json,
+            created_at
+        FROM backtest_runs
+        ORDER BY candidate_id, candidate_version, id
+        """,
+    )
+    kill_rows = _query_rows(
+        conn,
+        """
+        SELECT
+            candidate_id,
+            candidate_version,
+            params_hash,
+            reason,
+            created_at
+        FROM backtest_kills
+        ORDER BY candidate_id, candidate_version, id
+        """,
+    )
+    kills = {
+        (row.get("candidate_id"), row.get("candidate_version")): row
+        for row in kill_rows
+    }
+
+    grouped: dict[tuple[str, int], dict] = {}
+    for row in run_rows:
+        key = (row.get("candidate_id"), row.get("candidate_version"))
+        if key not in grouped:
+            candidate_json = _parse_json_object(row.get("candidate_json"))
+            grouped[key] = {
+                "candidateId": row.get("candidate_id"),
+                "version": row.get("candidate_version"),
+                "hypothesis": _candidate_hypothesis(candidate_json),
+                "paramsHash": row.get("params_hash"),
+                "stages": [],
+            }
+        grouped[key]["stages"].append(_run_stage_payload(row))
+
+    for key, kill in kills.items():
+        if key not in grouped:
+            grouped[key] = {
+                "candidateId": kill.get("candidate_id"),
+                "version": kill.get("candidate_version"),
+                "hypothesis": None,
+                "paramsHash": kill.get("params_hash"),
+                "stages": [],
+            }
+
+    candidates = []
+    for key in sorted(grouped):
+        candidate = grouped[key]
+        kill = kills.get(key)
+        kill_payload = None
+        if kill:
+            kill_payload = {
+                "reason": kill.get("reason"),
+                "date": kill.get("created_at"),
+            }
+        candidates.append({
+            **candidate,
+            "status": _candidate_status(candidate["stages"], kill),
+            "kill": kill_payload,
+            "killReason": kill_payload.get("reason") if kill_payload else None,
+            "killDate": kill_payload.get("date") if kill_payload else None,
+        })
+    return candidates
+
+
+def _scoreboard_payload(scoreboard_path: Path | None = None) -> dict:
+    scoreboard_path = scoreboard_path or WORKFLOW_SCOREBOARD_PATH
+    scoreboard = _load_json_file(scoreboard_path)
+    if not isinstance(scoreboard, dict):
+        return {}
+    payload = dict(scoreboard)
+    try:
+        updated_at = datetime.fromtimestamp(scoreboard_path.stat().st_mtime, timezone.utc).isoformat()
+    except OSError:
+        updated_at = None
+    payload["updatedAt"] = updated_at
+    return payload
+
+
+def _data_coverage(conn: sqlite3.Connection) -> dict:
+    intraday = _query_rows(
+        conn,
+        """
+        SELECT
+            interval,
+            MIN(ts) AS firstTs,
+            MAX(ts) AS lastTs,
+            COUNT(*) AS candles,
+            COUNT(DISTINCT substr(ts, 1, 10)) AS sessions
+        FROM intraday_prices
+        GROUP BY interval
+        ORDER BY interval
+        """,
+    )
+    daily_rows = _query_rows(
+        conn,
+        "SELECT MAX(trade_date) AS lastTradeDate FROM daily_prices",
+    )
+    return {
+        "intraday": intraday,
+        "daily": {
+            "lastTradeDate": daily_rows[0].get("lastTradeDate") if daily_rows else None,
+        },
+    }
+
+
+def _research_ledger(
+    db_path: Path | None = None,
+    scoreboard_path: Path | None = None,
+) -> dict:
+    db_path = db_path or DB_PATH
+    scoreboard_path = scoreboard_path or WORKFLOW_SCOREBOARD_PATH
+    if not db_path.exists():
+        return {
+            "ok": True,
+            "candidates": [],
+            "scoreboard": _scoreboard_payload(scoreboard_path),
+            "dataCoverage": {"intraday": [], "daily": {"lastTradeDate": None}},
+        }
+
+    with sqlite3.connect(db_path) as conn:
+        conn.row_factory = sqlite3.Row
+        return {
+            "ok": True,
+            "candidates": _research_candidates(conn),
+            "scoreboard": _scoreboard_payload(scoreboard_path),
+            "dataCoverage": _data_coverage(conn),
+        }
 
 
 def _workflow_status() -> dict:
@@ -933,6 +1145,9 @@ class Handler(BaseHTTPRequestHandler):
                 symbols = _symbols(qs.get("symbol", ["RELIANCE"])[0]) or ["RELIANCE"]
                 interval = qs.get("interval", ["5m"])[0]
                 _json(self, 200, {"ok": True, **_chart(symbols[0], interval)})
+                return
+            if parsed.path == "/api/research/ledger":
+                _json(self, 200, _research_ledger())
                 return
             if parsed.path == "/api/research":
                 symbols = _symbols(qs.get("symbols", ["RELIANCE"])[0])
