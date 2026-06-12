@@ -19,13 +19,14 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
 
 ## Current Score (two scales, graded 2026-06-12 by the manager)
 
-- **Functional scale: 80/100** (was 78; +2 on 2026-06-12: `SpencerDailySnapshot`
-  registered and verified Ready at 18:00 IST, plus a mid-session EOD guard so a
-  live price can never freeze as a day's close). Real data pipeline (EOD +
-  intraday, final-candle integrity), honest UI sync, full safety posture,
-  research protocol, battle-tested backtest harness. Loses points: 1m history
-  still shallow; Antigravity UI redesign pending; first automated 18:00 run not
-  yet observed end-to-end.
+- **Functional scale: 81/100** (was 80; +1 on 2026-06-12 evening: first automated
+  18:00 run verified end-to-end — exit 0, real close ₹1,293 stored for
+  2026-06-12 with a 15:30 IST quote stamp, +367 final intraday candles, and a
+  19:51 re-run inserted zero duplicates). Real data pipeline (EOD + intraday,
+  final-candle integrity), honest UI sync with live Research Ledger, full
+  safety posture, research protocol, battle-tested backtest harness, white
+  theme made structural. Loses points: 1m history still shallow; visual polish
+  ongoing (Antigravity removed from the team; manager owns styling).
 - **Profitability scale: 4/100.** Zero validated edge. Candidate SPNCR-001
   (intraday momentum) was tested and KILLED at in-sample: 28 trades, gross
   +₹78.03, costs ₹239.93, net −₹45.53 — profitable before costs, not after.
