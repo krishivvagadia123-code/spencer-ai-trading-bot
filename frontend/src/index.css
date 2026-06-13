@@ -318,11 +318,15 @@ main { padding-bottom: 104px !important; }
   main section {
     animation: section-rise both;
     animation-timeline: view();
-    animation-range: entry 0% entry 45%;
+    /* Start a touch after the section enters and settle by ~30% so each card
+       resolves on its own instead of every card sliding at once. */
+    animation-range: entry 8% entry 30%;
   }
+  /* Gentle fade + small lift. No perspective tilt or scale — the 3D rotateX
+     read as cheap and made stacked sections feel crowded. */
   @keyframes section-rise {
-    from { opacity: 0.25; transform: perspective(1000px) translateY(22px) rotateX(2.5deg) scale(0.985); }
-    to   { opacity: 1;    transform: perspective(1000px) translateY(0)    rotateX(0)      scale(1); }
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: translateY(0); }
   }
 }
 

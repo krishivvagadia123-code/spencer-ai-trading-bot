@@ -332,13 +332,28 @@ function Header({ onMenuOpen, backendStatus }) {
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-3 bg-gray-900 px-4 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-300">
-          <span className="text-blue-400">[Paper Mode]</span>
-          <span className={backendStatus === "connected" ? "text-emerald-400" : backendStatus === "checking" ? "text-amber-300" : "text-red-400"}>
-            [{backendLabel}]
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[#f1f5f9] bg-[#fafbfc] px-4 py-2 text-[11px] font-medium">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-blue-600">
+            <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            Paper mode
           </span>
-          <span className="text-gray-400">[Live Trading Disabled]</span>
-          <span className="text-gray-400">[Broker Execution Disabled]</span>
+          {backendStatus !== "disconnected" && (
+            <span
+              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 ${
+                backendStatus === "connected"
+                  ? "bg-emerald-50 text-emerald-700"
+                  : "bg-amber-50 text-amber-700"
+              }`}
+            >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  backendStatus === "connected" ? "bg-emerald-500" : "bg-amber-400"
+                }`}
+              />
+              {backendLabel}
+            </span>
+          )}
+          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-slate-500">Live trading off</span>
         </div>
       </header>
     </>
