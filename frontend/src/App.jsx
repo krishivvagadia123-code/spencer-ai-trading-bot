@@ -95,6 +95,12 @@ const normalizeResearchSymbol = (symbol) => {
 };
 const displayName = (value) =>
   String(value || "").replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+// Human-facing symbol: ".NS" is a Yahoo internal suffix, never shown to users.
+const prettySymbol = (value) => {
+  const raw = String(value || "").trim().toUpperCase();
+  const base = raw.replace(/\.(NS|BO)$/i, "");
+  return base ? `${base} · NSE` : "RELIANCE · NSE";
+};
 const sanitizeReason = (value) =>
   String(value || "N/A")
     .replace(/\s*score=[\d.]+/gi, "")
@@ -635,7 +641,7 @@ function StrategyWidget({ botState, backendStatus }) {
 function BrainWidget({ selectedStock }) {
   const { row, status } = useResearch(selectedStock);
   return (
-    <WidgetShell title={`Brain Check - ${normalizeResearchSymbol(selectedStock)}`} icon={Brain} badge={status === "ready" ? "Real backend data" : "Data unavailable"}>
+    <WidgetShell title={`Brain Check · ${prettySymbol(selectedStock)}`} icon={Brain} badge={status === "ready" ? "Real backend data" : "Data unavailable"}>
       {status === "loading" ? (
         <div className="rounded-md border border-blue-100 bg-[#eff6ff] px-3 py-2 text-[12px] text-[#2563eb]">Checking Spencer research engine...</div>
       ) : status !== "ready" ? (
@@ -827,7 +833,7 @@ function HoldingsPage({ botState, backendStatus }) {
           ["Holdings", holdings.length],
           ["Invested", money(capital.invested)],
           ["Current Value", isMissing(capital.currentValue) ? "awaiting first real quote" : money(capital.currentValue)],
-          ["Unrealised P&L", isMissing(capital.unrealisedPnl) ? "awaiting first real quote" : `${safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}${money(capital.unrealisedPnl)} ${pct(capital.unrealisedPnlPct)}`],
+          ["Unrealised P&L", isMissing(capital.unrealisedPnl) ? "awaiting first real quote" : `${pnlSign(capital.unrealisedPnl)}${money(capital.unrealisedPnl)} ${pct(capital.unrealisedPnlPct)}`],
         ]}
       />
       <HoldingsTable rows={holdings} />
@@ -857,18 +863,18 @@ function FundsPage({ botState, backendStatus, profile }) {
           ["Bot Budget", money(budget)],
           ["Invested", money(invested)],
           ["Free Cash", money(cash)],
-          ["Unrealised P&L", isMissing(capital.unrealisedPnl) ? "awaiting first real quote" : `${safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}${money(capital.unrealisedPnl)}`],
+          ["Unrealised P&L", isMissing(capital.unrealisedPnl) ? "awaiting first real quote" : `${pnlSign(capital.unrealisedPnl)}${money(capital.unrealisedPnl)}`],
         ]}
       />
       <section className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
         <div className="mb-3 text-[13px] font-semibold text-[#020617]">Capital Allocation</div>
         <div className="flex h-2 overflow-hidden rounded-full bg-gray-100">
           <div className="bg-[#2563eb]" style={{ width: `${investedPct}%` }} />
-          <div className="bg-emerald-400" style={{ width: `${cashPct}%` }} />
+          <div className="bg-[#cbd5e1]" style={{ width: `${cashPct}%` }} />
         </div>
         <div className="mt-3 flex gap-5 text-[11px] text-[#64748b]">
-          <span>Invested {investedPct.toFixed(1)}%</span>
-          <span>Free cash {cashPct.toFixed(1)}%</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#2563eb]" />Invested {investedPct.toFixed(1)}%</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#cbd5e1]" />Free cash {cashPct.toFixed(1)}%</span>
         </div>
       </section>
     </div>
@@ -1081,7 +1087,7 @@ function TradeTable({ title, rows, onTradeClick }) {
                   <td className={`px-4 py-3 font-semibold ${trade.side === "BUY" ? "text-emerald-600" : trade.side === "SELL" ? "text-red-600" : "text-[#64748b]"}`}>{trade.side || "N/A"}</td>
                   <td className="px-4 py-3 text-[#374151]">{qty(trade.qty)}</td>
                   <td className="px-4 py-3 text-[#374151]"><PriceStack value={trade.price} source={{ priceLabel: trade.priceLabel || (trade.time ? `journaled at ${trade.time}` : null) }} /></td>
-                  <td className={`px-4 py-3 font-semibold ${safeNumber(trade.pnl) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{isMissing(trade.pnl) ? "N/A" : `${safeNumber(trade.pnl) >= 0 ? "+" : ""}${money(trade.pnl)}`}</td>
+                  <td className={`px-4 py-3 font-semibold tabular-nums ${pnlTone(trade.pnl)}`}>{isMissing(trade.pnl) ? "N/A" : `${pnlSign(trade.pnl)}${money(trade.pnl)}`}</td>
                   <td className="px-4 py-3 text-[#64748b]">{sanitizeReason(trade.reason)}</td>
                   <td className="px-4 py-3 text-[#64748b]">{trade.status || "N/A"}</td>
                 </tr>
@@ -1144,7 +1150,7 @@ function HoldingsTable({ rows }) {
               money(holding.avg, 2),
               <PriceStack value={holding.ltp} source={holding} />,
               hasLtp ? money(safeNumber(holding.qty) * safeNumber(holding.ltp)) : "awaiting first real quote",
-              hasLtp ? `${rowPnl >= 0 ? "+" : ""}${money(rowPnl)} (${pct(rowPct)})` : "awaiting first real quote",
+              hasLtp ? `${pnlSign(rowPnl)}${money(rowPnl)} (${pct(rowPct)})` : "awaiting first real quote",
             ];
           })}
         />
@@ -1173,7 +1179,7 @@ function PositionsTable({ rows }) {
               qty(position.qty),
               money(position.avg, 2),
               <PriceStack value={position.ltp} source={position} />,
-              hasLtp ? `${rowPnl >= 0 ? "+" : ""}${money(rowPnl)}` : "awaiting first real quote",
+              hasLtp ? `${pnlSign(rowPnl)}${money(rowPnl)}` : "awaiting first real quote",
             ];
           })}
         />
@@ -1463,7 +1469,7 @@ function ResearchPanel({ selectedStock, row, status, loadResearch }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <div className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">Brain Check - {researchSymbol}</div>
+            <div className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">Brain Check · {prettySymbol(selectedStock)}</div>
             <span className={`rounded border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider ${
               status === "ready" ? "border-blue-100 bg-blue-50 text-blue-600" : status === "loading" ? "border-amber-200 bg-amber-50 text-amber-700" : "border-red-100 bg-red-50 text-red-600"
             }`}>

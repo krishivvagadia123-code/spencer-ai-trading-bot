@@ -326,15 +326,21 @@ main { padding-bottom: 104px !important; }
   }
 }
 
-/* Hover: cards lift off the plate with a soft, layered shadow. */
+/* Hover: cards lift off the plate with a soft, layered shadow.
+   No persistent will-change — that would pin every card to its own
+   compositor layer and repaint forever. The browser promotes on hover. */
 main section {
   transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
-  will-change: transform;
 }
 main section:hover {
   transform: translateY(-3px);
   box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 16px 40px rgba(15, 23, 42, 0.10);
   border-color: #d8dee9;
+}
+
+/* Respect reduced-motion preferences: no scroll-rise, no fades. */
+@media (prefers-reduced-motion: reduce) {
+  main section, #root > div { animation: none !important; }
 }
 
 /* Headings adopt the display face for a modern editorial hierarchy. */
