@@ -1,10 +1,12 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap");
 @import url('https://db.onlinewebfonts.com/c/440b53b1a1c65037f944ff19259d8014?family=Nokia+Cellphone+FC+Small');
 @import "tailwindcss";
 
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-instrument: "Instrument Serif", serif;
   --font-serif: "Instrument Serif", serif;
   --font-nokia: "Nokia Cellphone FC Small", monospace;
@@ -54,6 +56,10 @@
   font-family: var(--font-instrument);
 }
 
+@utility font-display {
+  font-family: var(--font-display);
+}
+
 @utility font-nokia {
   font-family: var(--font-nokia);
 }
@@ -62,10 +68,20 @@
 * { box-sizing: border-box; }
 html, body, #root { width: 100%; height: 100%; }
 
+/* The app shell is fixed-height with internal scrollers; the document root
+   must NEVER scroll. Without this, overscroll lands users on a blank void
+   (document grew to ~3800px against a ~730px viewport). */
+html { overflow: hidden; }
+
 body {
   margin: 0;
   overflow: hidden;
-  background-color: #f6f8fb;
+  /* Soft instrument-lab mesh: stays white, gains depth. */
+  background:
+    radial-gradient(1100px 520px at 85% -10%, #eef2ff 0%, rgba(238, 242, 255, 0) 60%),
+    radial-gradient(900px 480px at -10% 35%, #ecfeff 0%, rgba(236, 254, 255, 0) 55%),
+    radial-gradient(700px 420px at 50% 110%, #f0fdf4 0%, rgba(240, 253, 244, 0) 50%),
+    #f6f8fb;
   color: var(--color-gray-900);
   font-family: var(--font-sans);
   font-size: 14px;
@@ -75,6 +91,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
   position: relative;
 }
+
+/* Numerals everywhere align like an instrument readout. */
+.tabular-nums, .font-display { font-variant-numeric: tabular-nums; }
 
 button, input, select, textarea { font: inherit; color: inherit; }
 
@@ -289,3 +308,42 @@ input:focus, textarea:focus {
 .dashboard-light .muted-text {
   color: #64748b !important;
 }
+
+/* Clearance so the floating "Ask Spencer" button never covers card content. */
+main { padding-bottom: 104px !important; }
+
+/* Cards rise gently as they scroll into view (scroll-driven, no JS).
+   Browsers without animation-timeline simply render static — no harm. */
+@supports (animation-timeline: view()) {
+  main section {
+    animation: section-rise both;
+    animation-timeline: view();
+    animation-range: entry 0% entry 45%;
+  }
+  @keyframes section-rise {
+    from { opacity: 0.25; transform: perspective(1000px) translateY(22px) rotateX(2.5deg) scale(0.985); }
+    to   { opacity: 1;    transform: perspective(1000px) translateY(0)    rotateX(0)      scale(1); }
+  }
+}
+
+/* Hover: cards lift off the plate with a soft, layered shadow. */
+main section {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease, border-color 0.25s ease;
+  will-change: transform;
+}
+main section:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.04), 0 16px 40px rgba(15, 23, 42, 0.10);
+  border-color: #d8dee9;
+}
+
+/* Headings adopt the display face for a modern editorial hierarchy. */
+h1, h2, h3 { font-family: var(--font-display); letter-spacing: -0.01em; }
+
+/* Section label caps (PORTFOLIO VALUE, RESEARCH LEDGER, ...) get precise
+   instrument-panel tracking. */
+main section [class*="uppercase"] { letter-spacing: 0.14em; }
+
+/* Soft entrance for the whole app on load. */
+#root > div { animation: app-fade 0.5s ease-out both; }
+@keyframes app-fade { from { opacity: 0; } to { opacity: 1; } }

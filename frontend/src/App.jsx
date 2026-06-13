@@ -61,6 +61,33 @@ const money = (value, digits = 0) =>
 const qty = (value) =>
   isMissing(value) ? "N/A" : Number(value).toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const pct = (value, digits = 2) => (isMissing(value) ? "N/A" : `${Number(value).toFixed(digits)}%`);
+// P&L colors derive from the live sign; zero/unavailable stays neutral — a
+// zero is not a profit and must never render green.
+const pnlSign = (value) => (safeNumber(value) > 0 ? "+" : "");
+const pnlTone = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return "text-[#64748b]";
+  return n > 0 ? "text-emerald-600" : "text-red-600";
+};
+const pnlChipTone = (value) => {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n === 0) return "border-[#e2e8f0] bg-[#f8fafc] text-[#475569]";
+  return n > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700";
+};
+const fmtIST = (ts) => {
+  const d = new Date(ts);
+  if (!ts || Number.isNaN(d.getTime())) return String(ts || "N/A");
+  return `${d.toLocaleString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  })} IST`;
+};
+const dateOnly = (ts) => (ts ? String(ts).slice(0, 10) : "N/A");
 const normalizeResearchSymbol = (symbol) => {
   const raw = String(symbol || "").trim().toUpperCase();
   if (!raw) return "RELIANCE.NS";
@@ -280,7 +307,7 @@ function Header({ onMenuOpen, backendStatus }) {
             <span className="block h-[1.5px] w-[18px] rounded-full bg-current" />
             <span className="block h-[1.5px] w-[18px] rounded-full bg-current" />
           </button>
-          <div className="absolute left-1/2 -translate-x-1/2 text-[20px] text-[#020617]">Spencer AI</div>
+          <div className="min-w-0 flex-1 truncate px-3 text-center font-display text-[20px] font-semibold tracking-tight text-[#0f172a]">Spencer AI</div>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
@@ -313,25 +340,39 @@ function Header({ onMenuOpen, backendStatus }) {
 }
 
 function TickerBar({ stocks, quotes }) {
-  const items = [...stocks, ...stocks];
+  // Single-line items so nothing ever clips; the bar scrolls only while the
+  // market is OPEN — a closed market is static data and the instrument should
+  // hold still (also spares the compositor an endless repaint).
+  const marketOpen = stocks.some((stock) => {
+    const state = String(quotes[stock.symbol]?.marketState || "").toUpperCase();
+    return state === "OPEN";
+  });
+  const items = marketOpen ? [...stocks, ...stocks] : stocks;
+  const meta = priceMeta(quotes[stocks[0]?.symbol] || {});
   return (
-    <div className="h-7 overflow-hidden bg-black text-white">
-      <div className="flex min-w-max animate-[marquee_45s_linear_infinite] items-center gap-8 py-1">
+    <div className="flex h-9 items-center overflow-hidden border-b border-white/10 bg-[#0b1220] text-white">
+      <div className={`flex min-w-max items-center gap-10 px-5 ${marketOpen ? "animate-[marquee_45s_linear_infinite]" : ""}`}>
         {items.map((stock, index) => {
           const quote = quotes[stock.symbol] || {};
           const change = Number(quote.changePct ?? quote.regularMarketChangePercent);
-          const up = Number.isFinite(change) ? change >= 0 : null;
+          const up = Number.isFinite(change) ? change > 0 : null;
+          const flat = Number.isFinite(change) && change === 0;
           return (
-            <span key={`${stock.symbol}-${index}`} className="flex items-center gap-2 text-[11px] font-semibold">
-              <span className={`h-1.5 w-1.5 rounded-full ${up === null ? "bg-gray-500" : up ? "bg-green-400" : "bg-red-400"}`} />
-              <span>{stock.symbol}</span>
-              <span className={up === false ? "text-red-400" : "text-green-400"}>
-                <PriceStack value={quote.price} source={quote} align="left" />
-              </span>
-              {!isMissing(change) && <span className={up ? "text-green-400" : "text-red-400"}>{up ? "+" : ""}{change.toFixed(2)}%</span>}
+            <span key={`${stock.symbol}-${index}`} className="flex items-center gap-2.5 whitespace-nowrap text-[12px]">
+              <span className={`h-1.5 w-1.5 rounded-full ${up === null || flat ? "bg-slate-400" : up ? "bg-emerald-400" : "bg-red-400"}`} />
+              <span className="font-semibold tracking-wide">{stock.symbol}</span>
+              <span className="font-display tabular-nums text-white/90">{priceText(quote.price)}</span>
+              {!isMissing(change) && (
+                <span className={`tabular-nums ${flat ? "text-slate-400" : up ? "text-emerald-400" : "text-red-400"}`}>
+                  {change > 0 ? "+" : ""}{change.toFixed(2)}%
+                </span>
+              )}
             </span>
           );
         })}
+      </div>
+      <div className="ml-auto hidden shrink-0 items-center gap-2 border-l border-white/10 px-4 text-[10px] font-medium uppercase tracking-[0.18em] text-white/55 sm:flex">
+        {meta}
       </div>
     </div>
   );
@@ -477,9 +518,9 @@ function PortfolioOverview({ botState, backendStatus, watchlistCount = 0 }) {
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">Portfolio Value</div>
-              <div className="text-[32px] font-bold leading-none text-[#020617]">{isMissing(totalValue) ? "awaiting first real quote" : money(totalValue)}</div>
-              <div className={`mt-2 inline-flex rounded-md border px-2 py-1 text-[12px] font-semibold ${safeNumber(totalPnl) >= 0 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}>
-                {isMissing(totalPnl) ? "awaiting first real quote" : `${totalPnl >= 0 ? "+" : ""}${money(totalPnl)} (${pct(capital.pnlPct)}) total P&L`}
+              <div className="font-display text-[40px] font-semibold leading-none tracking-tight text-[#020617] tabular-nums">{isMissing(totalValue) ? "awaiting first real quote" : money(totalValue)}</div>
+              <div className={`mt-2 inline-flex rounded-md border px-2 py-1 text-[12px] font-semibold tabular-nums ${pnlChipTone(totalPnl)}`}>
+                {isMissing(totalPnl) ? "awaiting first real quote" : `${pnlSign(totalPnl)}${money(totalPnl)} (${pct(capital.pnlPct)}) total P&L`}
               </div>
             </div>
             <div className="space-y-0.5 text-right text-[11px] text-[#64748b]">
@@ -488,22 +529,24 @@ function PortfolioOverview({ botState, backendStatus, watchlistCount = 0 }) {
               <div>Free cash: <span className="font-semibold text-[#111827]">{money(capital.cash)}</span></div>
             </div>
           </div>
-          <div className="mt-5 h-20 rounded-lg border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white" />
+          <div className="mt-5 flex h-20 items-center justify-center rounded-lg border border-dashed border-[#e2e8f0] bg-[#fafbfd] px-4 text-center text-[12px] text-[#94a3b8]">
+            No equity history yet in this epoch — the curve begins with the first paper trade.
+          </div>
         </section>
         <section className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm">
           <div className="mb-4 text-[11px] font-semibold uppercase tracking-wider text-[#94a3b8]">P&L Breakdown</div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-[12px] text-[#64748b]">Unrealised</span>
-              <span className={`font-semibold ${safeNumber(capital.unrealisedPnl) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                {safeNumber(capital.unrealisedPnl) >= 0 ? "+" : ""}{money(capital.unrealisedPnl)}
+              <span className={`font-semibold tabular-nums ${pnlTone(capital.unrealisedPnl)}`}>
+                {pnlSign(capital.unrealisedPnl)}{money(capital.unrealisedPnl)}
               </span>
             </div>
             <div className="h-px bg-gray-100" />
             <div className="flex items-center justify-between">
               <span className="text-[12px] text-[#64748b]">Realised</span>
-              <span className={`font-semibold ${safeNumber(capital.realisedPnl) >= 0 ? "text-emerald-600" : "text-red-600"}`}>
-                {safeNumber(capital.realisedPnl) >= 0 ? "+" : ""}{money(capital.realisedPnl)}
+              <span className={`font-semibold tabular-nums ${pnlTone(capital.realisedPnl)}`}>
+                {pnlSign(capital.realisedPnl)}{money(capital.realisedPnl)}
               </span>
             </div>
             <div className="text-right text-[11px] text-[#94a3b8]">{metrics.closedTrades ?? "N/A"} closed trades</div>
@@ -763,7 +806,7 @@ function OrdersPage({ botState, backendStatus, onTradeClick }) {
           ["Orders", orders.length],
           ["Closed Trades", metrics.closedTrades ?? closed.length],
           ["Wins / Losses", `${metrics.wins ?? 0} / ${metrics.losses ?? 0}`],
-          ["Realised P&L", `${realisedPnl >= 0 ? "+" : ""}${money(realisedPnl)}`],
+          ["Realised P&L", `${pnlSign(realisedPnl)}${money(realisedPnl)}`],
         ]}
       />
       <TradeTable title={`Closed Paper Trades - ${closed.length}`} rows={closed} onTradeClick={onTradeClick} />
@@ -869,7 +912,7 @@ function TradeTrackerPage({ botState, backendStatus, onTradeClick }) {
     <div className="space-y-4">
       <SummaryGrid
         cards={[
-          ["Realised P&L", `${realisedPnl >= 0 ? "+" : ""}${money(realisedPnl)}`],
+          ["Realised P&L", `${pnlSign(realisedPnl)}${money(realisedPnl)}`],
           ["Closed Trades", closed.length],
           ["Wins", botState?.metrics?.wins ?? 0],
           ["Losses", botState?.metrics?.losses ?? 0],
@@ -1038,7 +1081,7 @@ function TradeTable({ title, rows, onTradeClick }) {
                   <td className={`px-4 py-3 font-semibold ${trade.side === "BUY" ? "text-emerald-600" : trade.side === "SELL" ? "text-red-600" : "text-[#64748b]"}`}>{trade.side || "N/A"}</td>
                   <td className="px-4 py-3 text-[#374151]">{qty(trade.qty)}</td>
                   <td className="px-4 py-3 text-[#374151]"><PriceStack value={trade.price} source={{ priceLabel: trade.priceLabel || (trade.time ? `journaled at ${trade.time}` : null) }} /></td>
-                  <td className={`px-4 py-3 font-semibold ${safeNumber(trade.pnl) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{isMissing(trade.pnl) ? "N/A" : `${trade.pnl >= 0 ? "+" : ""}${money(trade.pnl)}`}</td>
+                  <td className={`px-4 py-3 font-semibold ${safeNumber(trade.pnl) >= 0 ? "text-emerald-600" : "text-red-600"}`}>{isMissing(trade.pnl) ? "N/A" : `${safeNumber(trade.pnl) >= 0 ? "+" : ""}${money(trade.pnl)}`}</td>
                   <td className="px-4 py-3 text-[#64748b]">{sanitizeReason(trade.reason)}</td>
                   <td className="px-4 py-3 text-[#64748b]">{trade.status || "N/A"}</td>
                 </tr>
@@ -1250,9 +1293,9 @@ const verdictClass = (status) => {
 };
 const stageRange = (stage) => {
   const dataset = stage?.dataset || {};
-  const start = dataset.start ? String(dataset.start) : null;
-  const end = dataset.end ? String(dataset.end) : null;
-  if (start && end) return `${start} to ${end}`;
+  const start = dataset.start ? dateOnly(dataset.start) : null;
+  const end = dataset.end ? dateOnly(dataset.end) : null;
+  if (start && end) return `${start} → ${end}`;
   return start || end || "N/A";
 };
 
@@ -1278,7 +1321,7 @@ function ResearchLedgerPanel() {
           <div className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">Research Ledger</div>
           <h2 id="research-ledger-title" className="mt-1 text-[18px] font-semibold text-[#020617]">Tested candidates and verdicts</h2>
           {scoreboard.updatedAt && (
-            <div className="mt-1 text-[11px] text-[#64748b]">Scoreboard updated {scoreboard.updatedAt}</div>
+            <div className="mt-1 text-[11px] text-[#64748b]">Scoreboard updated {fmtIST(scoreboard.updatedAt)}</div>
           )}
         </div>
         <button onClick={loadLedger} disabled={status === "loading"} className="flex items-center justify-center gap-2 rounded-lg bg-[#2563eb] px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-[#1d4ed8] disabled:cursor-wait disabled:opacity-70">
@@ -1313,7 +1356,7 @@ function ResearchLedgerPanel() {
                       <span className={`rounded border px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${verdictClass(candidate.status)}`}>{apiText(candidate.status)}</span>
                     </div>
                     {candidate.kill?.date && (
-                      <div className="mt-1 text-[11px] font-medium text-red-700">Killed {candidate.kill.date}</div>
+                      <div className="mt-1 text-[11px] font-medium text-red-700">Killed {fmtIST(candidate.kill.date)}</div>
                     )}
                   </div>
                   {candidate.kill?.reason && (
@@ -1467,9 +1510,9 @@ function TradeDetailModal({ trade, onClose }) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <div className={`mb-4 rounded-xl border p-4 ${win ? "border-emerald-200 bg-emerald-50/50" : "border-red-200 bg-red-50/50"}`}>
+        <div className={`mb-4 rounded-xl border p-4 ${win ? "border-emerald-200 bg-emerald-50" : "border-red-200 bg-red-50"}`}>
           <div className="mb-1 text-[11px] uppercase tracking-wider text-[#64748b]">Realised P&L</div>
-          <div className={`text-[28px] font-bold ${win ? "text-emerald-600" : "text-red-600"}`}>{isMissing(trade.pnl) ? "N/A" : `${win ? "+" : ""}${money(trade.pnl)}`}</div>
+          <div className={`text-[28px] font-bold ${win ? "text-emerald-700" : "text-red-700"}`}>{win ? "+" : ""}{money(trade.pnl)}</div>
         </div>
         <div className="mb-4 grid grid-cols-2 gap-3">
           <div className="rounded-lg border border-gray-200 p-3">
@@ -1582,7 +1625,7 @@ export default function App() {
   })();
 
   return (
-    <div className="dashboard-light h-screen w-screen overflow-hidden bg-[#f8fafc] text-[#020617]">
+    <div className="dashboard-light h-screen w-full overflow-hidden bg-transparent text-[#020617]">
       <TickerBar stocks={tickerStocks} quotes={quotes} />
       <Header backendStatus={backendStatus} onMenuOpen={() => setDrawerOpen(true)} />
       <Drawer open={drawerOpen} activePage={activePage} setActivePage={setActivePage} onClose={() => setDrawerOpen(false)} />

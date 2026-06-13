@@ -34,8 +34,8 @@
     }
   ],
   "display": {
-    "agent": "antigravity_designer",
-    "role": "Antigravity may only display verified backend truth."
+    "agent": "dashboard",
+    "role": "The dashboard may only display verified backend truth. (Antigravity was removed from the team 2026-06-12; the manager owns the frontend.)"
   },
   "globalBlocks": [
     "No agent can bypass risk gates.",

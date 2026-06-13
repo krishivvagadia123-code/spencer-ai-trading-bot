@@ -39,8 +39,8 @@ def agent_handoff_plan_for(task: Any) -> list[dict[str, str]]:
     if display:
         handoff.append({
             "stage": "DISPLAY",
-            "agent": str(display.get("agent", "antigravity_designer")),
-            "role": str(display.get("role", "Antigravity may only display verified backend truth.")),
+            "agent": str(display.get("agent", "dashboard")),
+            "role": str(display.get("role", "The dashboard may only display verified backend truth.")),
             "taskId": task.task_id,
         })
     return handoff

@@ -1,4 +1,4 @@
-"""
+﻿"""
 Deterministic AI-tool governance and trading-authority contract.
 
 This module is deliberately static and backend-owned. It tells the UI which
@@ -18,8 +18,8 @@ PAPER_ONLY_MODE = "paper-only"
 
 
 TOOL_ROLES: dict[str, dict[str, Any]] = {
-    "antigravity": {
-        "displayName": "Antigravity",
+    "dashboard": {
+        "displayName": "Dashboard (manager-owned)",
         "corePurpose": "Render verified backend state in the trading dashboard.",
         "owns": [
             "UI rendering",
@@ -63,7 +63,7 @@ TOOL_ROLES: dict[str, dict[str, Any]] = {
         ],
         "mustDefer": [
             "production implementation to Codex",
-            "UI rendering to Antigravity",
+            "UI rendering to the dashboard layer",
             "analysis drafts to GPT",
             "trade authorization to deterministic backend risk and order systems",
         ],
@@ -91,7 +91,7 @@ TOOL_ROLES: dict[str, dict[str, Any]] = {
         "mustDefer": [
             "architecture ambiguity to Claude",
             "trading decisions to deterministic backend authority",
-            "visual interaction choices to Antigravity",
+            "visual interaction choices to the dashboard layer",
         ],
         "mustNeverDo": [
             "invent missing strategy rules",
@@ -118,7 +118,7 @@ TOOL_ROLES: dict[str, dict[str, Any]] = {
         "mustDefer": [
             "system-impacting recommendations to Claude",
             "production code to Codex",
-            "UI behavior to Antigravity",
+            "UI behavior to the dashboard layer",
             "trade authorization to deterministic backend authority",
         ],
         "mustNeverDo": [
@@ -145,7 +145,7 @@ TOOL_ROLES: dict[str, dict[str, Any]] = {
             "which source of truth is authoritative",
         ],
         "mustDefer": [
-            "dashboard rendering to Antigravity",
+            "rendering to the dashboard layer",
             "architecture changes to Claude",
             "implementation changes to Codex",
             "explanatory reports to GPT",
@@ -176,7 +176,7 @@ WORKFLOW: list[dict[str, str]] = [
     },
     {
         "step": "display",
-        "owner": "antigravity",
+        "owner": "dashboard",
         "output": "reactive UI bound only to verified backend state and capabilities",
     },
     {
@@ -228,7 +228,7 @@ def build_action_capabilities(
     """
     Build UI capabilities from backend state.
 
-    Antigravity should use these booleans to enable/disable controls instead of
+    The dashboard should use these booleans to enable/disable controls instead of
     inferring permissions from labels, charts, or model text.
     """
     bot_status = bot_status or {}
@@ -247,7 +247,7 @@ def build_action_capabilities(
         "viewDashboard": _decision(
             action="viewDashboard",
             label="View verified dashboard state",
-            owner="antigravity",
+            owner="dashboard",
             allowed=True,
         ),
         "requestAnalysis": _decision(
@@ -322,7 +322,7 @@ def build_governance_snapshot(
     return {
         "ok": True,
         "mode": PAPER_ONLY_MODE,
-        "principle": "Claude governs, Codex builds, Antigravity displays, GPT explains, and the backend decides.",
+        "principle": "Claude governs, designs, and verifies; Codex builds; the dashboard displays; GPT explains; the backend decides.",
         "generatedAt": _now_iso(),
         "roles": TOOL_ROLES,
         "workflow": WORKFLOW,
@@ -332,7 +332,7 @@ def build_governance_snapshot(
         ),
         "hardRules": [
             "No AI tool may make or approve trading decisions.",
-            "Antigravity displays backend state and backend action permissions only.",
+            "The dashboard displays backend state and backend action permissions only.",
             "GPT analysis is advisory and cannot mutate trading state.",
             "Codex implements only complete, approved specifications.",
             "Claude validates boundaries but does not write production code.",

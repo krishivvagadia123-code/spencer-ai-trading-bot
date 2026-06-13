@@ -41,7 +41,7 @@ def test_agent_policy_has_required_automatic_roles():
     assert ("BUILD", "codex_builder") in stages
     assert ("REVIEW", "gpt_reviewer") in stages
     assert ("APPROVE", "trading_authority") in stages
-    assert policy["display"]["agent"] == "antigravity_designer"
+    assert policy["display"]["agent"] == "dashboard"
     assert policy["paperOnly"] is True
 
 
@@ -53,7 +53,7 @@ def test_agent_handoff_plan_is_generated_from_task(tmp_path: Path):
     handoff = agent_handoff_plan_for(task)
 
     assert [step["stage"] for step in handoff[:6]] == ["PLAN", "BUILD", "TEST", "REVIEW", "APPROVE", "LOG"]
-    assert handoff[-1]["agent"] == "antigravity_designer"
+    assert handoff[-1]["agent"] == "dashboard"
     assert all(step["taskId"] == task.task_id for step in handoff)
 
 
