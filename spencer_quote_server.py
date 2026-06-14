@@ -344,6 +344,7 @@ def _handoff_payload() -> dict:
         "endpoints": {
             "quotes": "/api/quotes?symbols=RELIANCE",
             "chart": "/api/chart?symbol=RELIANCE&interval=5m",
+            "health": "GET /api/health",
             "research": "/api/research?symbols=RELIANCE",
             "researchLedger": "GET /api/research/ledger",
             "botStart": "POST /api/bot/start",
@@ -480,6 +481,7 @@ WORKFLOW_LOGS_DIR = WORKFLOW_DIR / "logs"
 WORKFLOW_DEPLOYMENT_GATE_PATH = WORKFLOW_DIR / "deployment_gate.json"
 WORKFLOW_AGENT_POLICY_PATH = WORKFLOW_DIR / "agents" / "agent_policy.json"
 WORKFLOW_SCOREBOARD_PATH = WORKFLOW_DIR / "scoreboard.json"
+WORKFLOW_DAILY_AUDIT_LOG_PATH = WORKFLOW_LOGS_DIR / "daily_audit.log"
 
 
 def _state_json(conn: sqlite3.Connection, key: str, default=None):
@@ -595,6 +597,66 @@ def _load_json_file(path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _last_daily_audit(log_path: Path | None = None) -> dict | None:
+    path = log_path or WORKFLOW_DAILY_AUDIT_LOG_PATH
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return None
+
+    for line in reversed(lines):
+        parts = [part.strip() for part in line.split("|")]
+        overall_part = next(
+            (part for part in parts if part.startswith("OVERALL ")),
+            None,
+        )
+        if not parts or not parts[0] or overall_part is None:
+            continue
+        overall = overall_part.removeprefix("OVERALL ").strip().upper()
+        if overall not in {"PASS", "FAIL"}:
+            continue
+        return {
+            "timestamp": parts[0],
+            "overall": overall,
+        }
+    return None
+
+
+def _health_payload(
+    db_path: Path | None = None,
+    audit_log_path: Path | None = None,
+) -> dict:
+    # Lazy import avoids a module cycle: the auditor uses this server's DB_PATH
+    # as its command-line default.
+    from scripts import audit_data_integrity as audit
+
+    report = audit.audit_database(db_path or DB_PATH)
+    readiness = report["research_readiness"]
+    return {
+        "ok": True,
+        "integrity": {
+            "overall": report["summary"]["status"],
+            "checks": [
+                {
+                    "id": check["id"],
+                    "name": check["name"],
+                    "status": check["status"],
+                }
+                for check in report["checks"]
+            ],
+        },
+        "readiness": {
+            "fifteenMinSessions": readiness["distinct_15m_sessions"],
+            "oneMinSessions": readiness["distinct_1m_sessions"],
+            "required": readiness["minimum_15m_sessions"],
+            "verdict": readiness["status"],
+            "sessionsRemaining": readiness["sessions_remaining"],
+        },
+        "lastDailyAudit": _last_daily_audit(audit_log_path),
+        "asof": report["generated_at"],
+    }
 
 
 def _parse_json_object(raw):
@@ -1145,6 +1207,9 @@ class Handler(BaseHTTPRequestHandler):
                 symbols = _symbols(qs.get("symbol", ["RELIANCE"])[0]) or ["RELIANCE"]
                 interval = qs.get("interval", ["5m"])[0]
                 _json(self, 200, {"ok": True, **_chart(symbols[0], interval)})
+                return
+            if parsed.path == "/api/health":
+                _json(self, 200, _health_payload())
                 return
             if parsed.path == "/api/research/ledger":
                 _json(self, 200, _research_ledger())
