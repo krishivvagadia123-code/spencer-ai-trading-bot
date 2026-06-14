@@ -756,6 +756,7 @@ function DashboardPage({ botState, backendStatus, selectedStock, openAddWidget, 
     return (
       <div className="space-y-4">
         <PortfolioOverview botState={botState} backendStatus={backendStatus} watchlistCount={watchlistCount} />
+        <DataHealthStrip />
         <ResearchLedgerPanel />
         <BrainWidget selectedStock={selectedStock} />
         <TrustWidget backendStatus={backendStatus} botHealth={botHealth} quoteHealth={quoteHealth} selectedStock={selectedStock} />
@@ -765,6 +766,7 @@ function DashboardPage({ botState, backendStatus, selectedStock, openAddWidget, 
   return (
     <div className="space-y-4">
       <PortfolioOverview botState={botState} backendStatus={backendStatus} watchlistCount={watchlistCount} />
+      <DataHealthStrip />
       <ResearchLedgerPanel />
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 xl:grid-cols-3">
         <CapitalGuardWidget botState={botState} />
@@ -1282,6 +1284,84 @@ function useResearchLedger() {
     loadLedger();
   }, [loadLedger]);
   return { ledger, status, health, loadLedger };
+}
+
+function useHealth() {
+  const [health, setHealth] = useState(null);
+  const [status, setStatus] = useState("loading");
+  const loadHealth = useCallback(async () => {
+    setStatus((previous) => (previous === "ready" ? "refreshing" : "loading"));
+    try {
+      const res = await fetch(`${SPENCER_API_BASE}/api/health`, { cache: "no-store" });
+      if (!res.ok) throw new Error("Health API returned an error");
+      const json = await res.json();
+      if (!json?.ok) throw new Error("Health API returned ok=false");
+      setHealth(json);
+      setStatus("ready");
+    } catch (error) {
+      setStatus("error");
+    }
+  }, []);
+  useEffect(() => {
+    loadHealth();
+  }, [loadHealth]);
+  return { health, status, loadHealth };
+}
+
+function DataHealthStrip() {
+  const { health, status, loadHealth } = useHealth();
+  const integrity = health?.integrity?.overall;
+  const readiness = health?.readiness || {};
+  const have = safeNumber(readiness.fifteenMinSessions);
+  const need = safeNumber(readiness.required);
+  const remaining = safeNumber(readiness.sessionsRemaining);
+  const ready = String(readiness.verdict || "").toUpperCase() === "READY";
+  const pctReady = need > 0 ? Math.min(100, (have / need) * 100) : 0;
+
+  const integrityTone =
+    integrity === "PASS" ? "text-emerald-600" : integrity === "FAIL" ? "text-red-600" : "text-[#64748b]";
+  const integrityDot =
+    integrity === "PASS" ? "bg-emerald-500" : integrity === "FAIL" ? "bg-red-500" : "bg-slate-400";
+
+  return (
+    <section className="rounded-xl border border-[#e5e7eb] bg-white p-5 shadow-sm" aria-label="Data health and research readiness">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="text-xs font-semibold uppercase tracking-wider text-[#94a3b8]">Data Health</div>
+        <button onClick={loadHealth} className="text-[11px] font-medium text-[#2563eb] hover:underline">Refresh</button>
+      </div>
+
+      {status === "error" || !health ? (
+        <div className="mt-3 text-[13px] text-[#64748b]">
+          {status === "loading" ? "Checking the data clock…" : "Health endpoint unavailable — start the backend on 127.0.0.1:8787."}
+        </div>
+      ) : (
+        <div className="mt-4 grid grid-cols-1 gap-5 md:grid-cols-[auto_1fr]">
+          <div className="flex items-center gap-2">
+            <span className={`h-2 w-2 rounded-full ${integrityDot}`} />
+            <span className="text-[13px] text-[#475569]">Integrity</span>
+            <span className={`text-[13px] font-semibold ${integrityTone}`}>{integrity || "—"}</span>
+          </div>
+          <div>
+            <div className="flex items-baseline justify-between">
+              <span className="text-[13px] text-[#475569]">
+                RELIANCE mastery data{" "}
+                <span className="font-semibold text-[#0f172a]">{ready ? "READY" : "building"}</span>
+              </span>
+              <span className="text-[12px] tabular-nums text-[#64748b]">
+                {have}/{need} sessions{!ready && remaining > 0 ? ` · ${remaining} to go` : ""}
+              </span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-gray-100">
+              <div className={`h-full ${ready ? "bg-emerald-500" : "bg-[#2563eb]"}`} style={{ width: `${pctReady}%` }} />
+            </div>
+            <div className="mt-2 text-[11px] text-[#94a3b8]">
+              SPNCR-003 (the next candidate) unlocks at {need} sessions of 15-minute history — grows ~5 per trading week, automatically.
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function researchStatusText(status) {
