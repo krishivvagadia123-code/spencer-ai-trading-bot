@@ -315,7 +315,7 @@ function Header({ onMenuOpen, backendStatus }) {
           </button>
           <div className="min-w-0 flex-1 truncate px-3 text-center font-display text-[20px] font-semibold tracking-tight text-[#0f172a]">Spencer AI</div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2.5 py-1 text-[11px] font-semibold text-red-600">
+            <div className="glass-pill text-[11px] font-semibold">
               <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
               {marketClosed ? "Closed" : "Open"}
             </div>
@@ -332,19 +332,13 @@ function Header({ onMenuOpen, backendStatus }) {
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[#f1f5f9] bg-[#fafbfc] px-4 py-2 text-[11px] font-medium">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-blue-600">
+        <div className="flex flex-wrap items-center justify-center gap-2 border-t border-[#f1f5f9] bg-white px-4 py-2 text-[11px] font-medium text-[#1e293b]">
+          <span className="glass-pill">
             <span className="h-1.5 w-1.5 rounded-full bg-blue-500" />
             Paper mode
           </span>
           {backendStatus !== "disconnected" && (
-            <span
-              className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 ${
-                backendStatus === "connected"
-                  ? "bg-emerald-50 text-emerald-700"
-                  : "bg-amber-50 text-amber-700"
-              }`}
-            >
+            <span className="glass-pill">
               <span
                 className={`h-1.5 w-1.5 rounded-full ${
                   backendStatus === "connected" ? "bg-emerald-500" : "bg-amber-400"
@@ -353,7 +347,14 @@ function Header({ onMenuOpen, backendStatus }) {
               {backendLabel}
             </span>
           )}
-          <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-slate-500">Live trading off</span>
+          <span className="glass-pill">
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
+            Live trading off
+          </span>
+          <span className="glass-pill">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-500" />
+            Broker execution off
+          </span>
         </div>
       </header>
     </>
