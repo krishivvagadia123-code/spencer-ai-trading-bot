@@ -9,5 +9,5 @@ start "Spencer AI Quote Server" /min cmd /k ""%SPENCER_PY%" "%~dp0spencer_quote_
 cd /d "%~dp0frontend"
 start "Spencer AI Website" /min cmd /k "npm run dev"
 timeout /t 3 >nul
-start "" "http://localhost:5175"
+start "" "http://localhost:5180"
 endlocal
