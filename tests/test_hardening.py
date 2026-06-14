@@ -160,9 +160,8 @@ def test_future_message_includes_seconds(cfg):
 # ═══════════════════════════════════════════════════════════════════════════════
 # FIX #3 — NSE holiday registry
 # ═══════════════════════════════════════════════════════════════════════════════
-def test_default_registry_starts_empty():
-    """Paper-testing default: no holidays registered."""
-    assert is_nse_holiday(date(2026, 12, 25)) is False
+def test_default_registry_leaves_normal_trading_day_open():
+    assert is_nse_holiday(date(2026, 4, 15)) is False
 
 
 def test_is_nse_holiday_for_added_date(holidays_snapshot):

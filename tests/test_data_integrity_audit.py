@@ -124,7 +124,7 @@ def _trading_days(start, count):
     days = []
     current = start
     while len(days) < count:
-        if current.weekday() < 5:
+        if current.weekday() < 5 and not DEFAULT_REGISTRY.is_holiday(current):
             days.append(current)
         current += timedelta(days=1)
     return days
