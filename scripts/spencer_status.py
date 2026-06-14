@@ -99,6 +99,42 @@ def _research_ledger(db_path: Path) -> list[dict[str, Any]]:
     ]
 
 
+def _live_engine(db_path: Path) -> dict[str, Any]:
+    """Live paper engine readiness: ARMED if a candidate carries an un-killed
+    WALK_FORWARD PASS, else DORMANT. Plus journaled run/trade counts. Read-only."""
+    result: dict[str, Any] = {
+        "status": "DORMANT", "approvedCandidate": None, "runs": 0, "trades": 0,
+    }
+    try:
+        with audit._read_only_connection(db_path) as conn:
+            try:
+                passed = conn.execute(
+                    """
+                    SELECT r.candidate_id, r.candidate_version
+                    FROM backtest_runs r
+                    WHERE r.stage = 'WALK_FORWARD' AND r.status = 'PASS'
+                      AND NOT EXISTS (
+                          SELECT 1 FROM backtest_kills k
+                          WHERE k.candidate_id = r.candidate_id
+                            AND k.candidate_version = r.candidate_version)
+                    ORDER BY r.id DESC LIMIT 1
+                    """
+                ).fetchone()
+            except sqlite3.OperationalError:
+                passed = None
+            if passed:
+                result["status"] = "ARMED"
+                result["approvedCandidate"] = f"{passed[0]} v{passed[1]}"
+            for table, key in (("live_paper_runs", "runs"), ("live_paper_trades", "trades")):
+                try:
+                    result[key] = conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                except sqlite3.OperationalError:
+                    pass
+    except (OSError, sqlite3.Error):
+        pass
+    return result
+
+
 def _git_value(repo_root: Path, *args: str) -> str | None:
     try:
         completed = subprocess.run(
@@ -160,6 +196,7 @@ def build_status(
         "dataHealth": data_health,
         "readiness": readiness,
         "researchLedger": research_ledger,
+        "liveEngine": _live_engine(db_path),
         "git": _git_head(repo_root),
     }
 
@@ -226,6 +263,19 @@ def render_text(status: dict[str, Any]) -> str:
         )
     else:
         lines.append("  No research candidates recorded.")
+    live = status.get("liveEngine", {})
+    lines.extend(
+        [
+            "",
+            "LIVE PAPER ENGINE",
+            (
+                f"  {_display(live.get('status'))}"
+                + (f" - approved: {live.get('approvedCandidate')}" if live.get("approvedCandidate")
+                   else " - no candidate has passed the ladder yet")
+            ),
+            f"  Journaled paper runs: {_display(live.get('runs'))} | trades: {_display(live.get('trades'))}",
+        ]
+    )
     lines.extend(
         [
             "",

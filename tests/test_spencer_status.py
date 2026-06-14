@@ -147,8 +147,15 @@ def test_status_report_contains_every_section_and_json_parses(
         "dataHealth",
         "readiness",
         "researchLedger",
+        "liveEngine",
         "git",
     }
+    # No candidate has passed (the seeded run is a FAIL), so the live engine is
+    # dormant and reports zero journaled paper activity.
+    assert payload["liveEngine"]["status"] == "DORMANT"
+    assert payload["liveEngine"]["approvedCandidate"] is None
+    assert payload["liveEngine"]["runs"] == 0
+    assert payload["liveEngine"]["trades"] == 0
     assert payload["scoreboard"]["functional"] == 83
     assert payload["safetyGate"]["deploymentBlocked"] is True
     assert payload["dataHealth"]["overall"] == "PASS"
