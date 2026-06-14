@@ -22,7 +22,9 @@ from bot.live_paper_trader import (
     assert_candidate_passed,
     assert_paper_only,
     run_dry_run,
+    run_dry_run_range,
 )
+from bot.intraday_backtest import run_backtest
 from bot.intraday_backtest import (
     Candle,
     _contextualize_candles,
@@ -259,6 +261,44 @@ def test_dry_run_isolated_from_epoch_trades(tmp_path):
         assert conn.execute("SELECT COUNT(*) FROM live_paper_runs").fetchone()[0] == 1
         # the epoch trades table is untouched: still just the pre-existing row
         assert conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0] == 1
+
+
+# ── backtest parity (the live engine must reproduce the backtest exactly) ─────
+
+def _make_multi_session_db(db_path: Path, sessions=3, bars=5):
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute("""
+            CREATE TABLE intraday_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT, symbol TEXT, interval TEXT,
+                ts TEXT, open REAL, high REAL, low REAL, close REAL, volume REAL, source TEXT
+            )""")
+        for day in range(11, 11 + sessions):
+            base = datetime(2026, 6, day, 9, 15, tzinfo=IST)
+            for i in range(bars):
+                ts = (base + timedelta(minutes=15 * i)).isoformat()
+                price = 100 + i  # gently rising — a trivial pattern
+                conn.execute(
+                    "INSERT INTO intraday_prices (symbol, interval, ts, open, high, low, close, volume, source)"
+                    " VALUES ('RELIANCE','15m',?,?,?,?,?,1000,'test')",
+                    (ts, price, price + 1, price - 1, price))
+        conn.commit()
+
+
+def test_live_engine_matches_backtest_exactly(tmp_path):
+    """The live execution path must produce the SAME trades and net P&L as the
+    backtest over the same data — otherwise a candidate would behave differently
+    live than it tested. This is the trust guarantee."""
+    db = tmp_path / "parity.db"
+    _make_multi_session_db(db, sessions=3, bars=5)
+    cand = _candidate(entry=ALWAYS, exit_=NEVER, stop={"type": "fixed_pct", "pct": 0.5})
+
+    bt = run_backtest(cand, db_path=db, stage="IN_SAMPLE", persist=False)
+    live = run_dry_run_range(cand, db_path=db, gate_path=_gate(tmp_path / "gate.json"),
+                             persist=False)
+
+    assert live["trades"] == bt.summary["trades"]
+    assert live["net_pnl"] == bt.summary["net_pnl"]
+    assert live["trades"] == 3  # one squared-off trade per session
 
 
 # ── no-broker invariant ───────────────────────────────────────────────────────

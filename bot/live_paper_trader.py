@@ -480,6 +480,49 @@ def run_dry_run(
     return summary
 
 
+def run_dry_run_range(
+    candidate: ResearchCandidate,
+    *,
+    db_path: str | Path = DB_PATH,
+    start: date | str | None = None,
+    end: date | str | None = None,
+    gate_path: str | Path = GATE_PATH,
+    persist: bool = True,
+) -> dict:
+    """Replay the candidate forward across EVERY collected session in the range,
+    one continuous run with daily square-off — the same loop shape as the
+    backtest. Used to cross-check that the live execution path reproduces the
+    backtest's verdict over the full dataset.
+    """
+    assert_paper_only(gate_path)
+    candles = _contextualize_candles(load_candles(db_path, candidate, start=start, end=end))
+    trader = LivePaperTrader(candidate, mode="DRY_RUN")
+    for i, candle in enumerate(candles):
+        nxt = candles[i + 1] if i + 1 < len(candles) else None
+        is_final = nxt is None or not _same_session(candle, nxt)
+        trader.on_bar(candle, is_session_final=is_final)
+
+    # Per-session P&L breakdown from the journaled trades.
+    by_session: dict[str, dict] = {}
+    for t in trader.trades:
+        sd = t["exit_ts"][:10]
+        agg = by_session.setdefault(sd, {"session": sd, "trades": 0, "net_pnl": 0.0})
+        agg["trades"] += 1
+        agg["net_pnl"] = round(agg["net_pnl"] + t["net_pnl"], 2)
+
+    summary = trader.summary()
+    summary["sessions"] = sorted(by_session.values(), key=lambda r: r["session"])
+    summary["session_count"] = len({c.session_date for c in candles})
+    summary["dataset_start"] = candles[0].ts.isoformat() if candles else None
+    summary["dataset_end"] = candles[-1].ts.isoformat() if candles else None
+    if persist:
+        sd_label = f"{start or 'all'}..{end or 'all'}"
+        summary["run_id"] = _persist_run(
+            db_path, candidate, "DRY_RUN_RANGE", sd_label, "DONE",
+            summary, trader.trades, trader.decisions)
+    return summary
+
+
 def _interval_minutes(candidate: ResearchCandidate) -> int:
     return 1 if candidate.interval == "1m" else 15
 
