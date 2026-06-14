@@ -19,12 +19,13 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
 
 ## Current Score (two scales, graded 2026-06-12 by the manager)
 
-- **Functional scale: 82/100.** History: 78 → 80 (scheduled task registered +
-  mid-session EOD guard) → 81 (first automated 18:00 run verified end-to-end:
-  exit 0, real close ₹1,293 stored with a 15:30 IST stamp, +367 final candles,
-  zero duplicates on re-run) → 82 (11 visual bugs fixed + immersive white
-  redesign, all verified in-browser). Loses points: 1m history still shallow;
-  Brain/Trade-Tracker pages unaudited visually.
+- **Functional scale: 84/100.** History: 78 → 80 (scheduled task + EOD guard)
+  → 81 (first automated 18:00 run verified) → 82 (visual bug fixes + redesign)
+  → 83 (data-integrity auditor + complete 2026 NSE holiday calendar) → 84
+  (Live Paper-Trading Execution Engine: built, gated, 14 tests, dry-run proven
+  on real candles). Loses points: 1m history shallow; frontend consolidation
+  pending (two frontends, clone unbacked); live path unexercised until a
+  candidate passes.
 - **Profitability scale: 4/100.** Zero validated edge. Two candidates tested
   and killed honestly (see Research Ledger). Cost-feasibility groundwork is
   the only credit.
@@ -72,6 +73,23 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
   bar); archived in `candidates/SPNCR-002.md`. Lesson: lower frequency moved
   net per trade from −0.16% to −0.02%; captured breakout drift is still ~7×
   too small. Next hypothesis must select high-expected-range DAYS.
+
+## Live Paper-Trading Execution Engine (built 2026-06-14, dormant by design)
+
+- `bot/live_paper_trader.py`: forward, one-bar-at-a-time paper executor that
+  reuses the backtest's own rule/sizing/stop/fill functions, so a candidate
+  behaves identically live and in backtest. Pending-order model (decision on
+  bar N fills at bar N+1 open); stop on a bar's low; forced 15:25 square-off;
+  one position; Rs.5,000; INTRADAY only.
+- Safety gates: paper-only asserted from the deployment gate; LIVE additionally
+  requires a journaled WALK_FORWARD PASS and refuses any killed candidate. With
+  nothing passed, LIVE correctly refuses today (verified on SPNCR-002).
+- Journals to dedicated `live_paper_runs/trades/decisions` tables only — never
+  the epoch `trades` table; no broker SDK, no order placement.
+- Dry-run proven on real candles: SPNCR-002 on 2026-06-12 -> 1 trade,
+  net -Rs.8.01 after costs, squared off at session end. `scripts/run_live_paper.py`.
+- 14 dedicated tests; full suite 514 passing. This is the bridge from "can
+  backtest" to "can paper-trade live" — it activates the day a candidate passes.
 
 ## Data Clock (automatic)
 
