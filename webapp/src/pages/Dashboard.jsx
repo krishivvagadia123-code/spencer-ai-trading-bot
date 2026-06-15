@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { MetricsSection } from "../components/MetricsSection";
 import { DataHealthPanel } from "../components/DataHealthPanel";
+import { RelianceLiveChart } from "../components/RelianceLiveChart";
 import { money, pct, pnlSign, pnlTone } from "../utils/helpers";
 
 const EASE = [0.16, 1, 0.3, 1];
@@ -197,14 +198,12 @@ export function Dashboard({
         />
 
         <div className="portfolio-glass liquid-glass-light relative overflow-hidden rounded-[28px] px-10 py-14 md:px-16 md:py-20">
-          {/* Ghost RELIANCE */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
-            <span
-              className="font-display font-bold"
-              style={{ fontSize: "clamp(90px,16vw,200px)", opacity: 0.025, letterSpacing: "-0.04em", lineHeight: 1 }}
-            >
-              RELIANCE
-            </span>
+          {/* TradingView lightweight chart fed by Spencer's real quote API. */}
+          <div className="portfolio-chart-layer inset-x-0 bottom-0 top-1/3 opacity-[0.72] md:left-1/3">
+            <RelianceLiveChart
+              marketState={quote?.marketState}
+              marketStateLabel={quote?.marketStateLabel}
+            />
           </div>
 
           <div className="relative z-10">

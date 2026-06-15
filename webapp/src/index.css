@@ -1,6 +1,15 @@
 @import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&family=Syne:wght@600;700;800&display=swap");
 @import "tailwindcss";
 
+/* Live-market pulse for the RELIANCE chart indicator (the one intentional
+   animation — signals the market is open). GPU-cheap opacity/scale pulse. */
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { opacity: 0.55; transform: scale(1.25); box-shadow: 0 0 0 4px rgba(16, 185, 129, 0); }
+}
+.live-pulse { animation: live-pulse 1.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .live-pulse { animation: none; } }
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
@@ -353,6 +362,10 @@ body {
   backdrop-filter: blur(18px) saturate(165%) contrast(104%);
   -webkit-backdrop-filter: blur(18px) saturate(165%) contrast(104%);
 }
+.portfolio-chart-layer {
+  position: absolute !important;
+  z-index: 1 !important;
+}
 .story-scroll-track {
   height: calc(500dvh - 17.5rem);
   min-height: 3000px;
@@ -579,7 +592,13 @@ textarea {
     -webkit-backdrop-filter: blur(12px) saturate(145%);
   }
   .portfolio-glass {
+    padding-bottom: 17rem;
     backdrop-filter: blur(12px) saturate(145%);
     -webkit-backdrop-filter: blur(12px) saturate(145%);
+  }
+  .portfolio-chart-layer {
+    top: auto !important;
+    height: 14.5rem;
+    opacity: 0.72;
   }
 }

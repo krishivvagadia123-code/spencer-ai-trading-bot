@@ -8,6 +8,7 @@
     "preview": "vite preview --host 0.0.0.0 --port 5180 --strictPort"
   },
   "dependencies": {
+    "lightweight-charts": "^5.2.0",
     "lucide-react": "^0.460.0",
     "motion": "^11.11.0",
     "react": "^18.3.1",
