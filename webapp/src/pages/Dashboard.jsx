@@ -2,6 +2,7 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import { MetricsSection } from "../components/MetricsSection";
 import { DataHealthPanel } from "../components/DataHealthPanel";
+import { BackgroundActivity } from "../components/BackgroundActivity";
 import { RelianceLiveChart } from "../components/RelianceLiveChart";
 import { money, pct, pnlSign, pnlTone } from "../utils/helpers";
 
@@ -296,6 +297,10 @@ export function Dashboard({
 
       <div className="mt-8">
         <DataHealthPanel health={health} status={healthStatus} onRefresh={refreshHealth} />
+      </div>
+
+      <div className="mt-6">
+        <BackgroundActivity health={health} ledger={ledger} />
       </div>
 
       <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">

@@ -624,6 +624,38 @@ def _last_daily_audit(log_path: Path | None = None) -> dict | None:
     return None
 
 
+def _today_activity(db_path: Path | None = None) -> dict:
+    """Read-only proof of background activity today: candles collected and the
+    last collection timestamp. Honest about what the bot actually does each day
+    (collect data + audit) — it does not run an experiment every day."""
+    from bot.market_data import now_ist
+    today = now_ist().date().isoformat()
+    out = {"date": today, "candles15m": 0, "candles1m": 0,
+           "lastCollectedAt": None, "dailyClose": None}
+    path = Path(db_path or DB_PATH)
+    if not path.exists():
+        return out
+    uri = f"{path.resolve().as_uri()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as conn:
+        try:
+            for interval, key in (("15m", "candles15m"), ("1m", "candles1m")):
+                row = conn.execute(
+                    "SELECT COUNT(*) FROM intraday_prices WHERE interval=? AND date(ts)=?",
+                    (interval, today),
+                ).fetchone()
+                out[key] = int(row[0]) if row else 0
+            row = conn.execute("SELECT MAX(created_at) FROM intraday_prices").fetchone()
+            out["lastCollectedAt"] = row[0] if row and row[0] else None
+            row = conn.execute(
+                "SELECT close FROM daily_prices WHERE trade_date=? AND symbol='RELIANCE'",
+                (today,),
+            ).fetchone()
+            out["dailyClose"] = row[0] if row and row[0] is not None else None
+        except sqlite3.OperationalError:
+            pass
+    return out
+
+
 def _health_payload(
     db_path: Path | None = None,
     audit_log_path: Path | None = None,
@@ -636,6 +668,7 @@ def _health_payload(
     readiness = report["research_readiness"]
     return {
         "ok": True,
+        "todayActivity": _today_activity(db_path),
         "integrity": {
             "overall": report["summary"]["status"],
             "checks": [
