@@ -14,6 +14,7 @@ import { Research } from "./pages/Research";
 import { Governance } from "./pages/Governance";
 import { TradeTracker } from "./pages/TradeTracker";
 import { Profile } from "./pages/Profile";
+import { WhatIsSpencer } from "./pages/WhatIsSpencer";
 
 import { useBotState } from "./hooks/useBotState";
 import { useQuotes } from "./hooks/useQuotes";
@@ -48,10 +49,19 @@ export default function App() {
 
   const mainRef = useRef(null);
   const quote = quotes[ONE_STOCK_SYMBOL] || {};
+  const navigate = (page) => {
+    setActivePage(page);
+    mainRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   return (
     <div className="app-shell flex h-screen flex-col font-sans text-[var(--color-primary-dark-text)]">
-      <Header onMenuOpen={() => setMenuOpen(true)} backendStatus={backendStatus} quote={quote} />
+      <Header
+        onMenuOpen={() => setMenuOpen(true)}
+        onNavigate={navigate}
+        backendStatus={backendStatus}
+        quote={quote}
+      />
 
       <main
         ref={mainRef}
@@ -97,10 +107,27 @@ export default function App() {
           {activePage === "Bids" && <Bids botState={botState} />}
           {activePage === "Governance" && <Governance botState={botState} />}
           {activePage === "Profile" && <Profile profile={profile} setProfile={setProfile} />}
+          {activePage === "WhatIsSpencer" && (
+            <WhatIsSpencer
+              mainRef={mainRef}
+              quote={quote}
+              botState={botState}
+              ledger={ledger}
+              onNavigate={navigate}
+            />
+          )}
         </div>
       </main>
 
-      <NavigationDrawer open={menuOpen} activePage={activePage} onNavigate={(p) => { setActivePage(p); setMenuOpen(false); }} onClose={() => setMenuOpen(false)} />
+      <NavigationDrawer
+        open={menuOpen}
+        activePage={activePage}
+        onNavigate={(page) => {
+          navigate(page);
+          setMenuOpen(false);
+        }}
+        onClose={() => setMenuOpen(false)}
+      />
       <SpencerChat open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );

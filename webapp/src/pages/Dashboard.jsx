@@ -1,9 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { motion, useMotionValue, useTransform, useSpring } from "motion/react";
-import { BentoGrid } from "../components/BentoGrid";
-import { ScrollStory } from "../components/ScrollStory";
 import { MetricsSection } from "../components/MetricsSection";
-import { SpencerCore3D } from "../components/SpencerCore3D";
 import { DataHealthPanel } from "../components/DataHealthPanel";
 import { money, pct, pnlSign, pnlTone } from "../utils/helpers";
 
@@ -98,6 +95,38 @@ function CapitalGuardRing({ invested, budget }) {
   );
 }
 
+const finiteNumber = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+};
+
+const signedMoney = (value) => {
+  const number = finiteNumber(value);
+  return number === null ? "—" : `${pnlSign(number)}${money(number, 2)}`;
+};
+
+const signedPct = (value) => {
+  const number = finiteNumber(value);
+  return number === null ? "—" : `${pnlSign(number)}${pct(number, 2)}`;
+};
+
+function DashboardMetric({ label, value, detail, tone = "" }) {
+  return (
+    <div className="glass-metric rounded-[22px] px-5 py-5">
+      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+        {label}
+      </div>
+      <div className={`mt-2 font-display text-[24px] font-semibold leading-tight tabular-nums ${tone || "text-slate-950"}`}>
+        {value}
+      </div>
+      <div className="mt-2 text-[11px] leading-relaxed text-slate-600">
+        {detail}
+      </div>
+    </div>
+  );
+}
+
 export function Dashboard({
   mainRef,
   botState,
@@ -113,6 +142,37 @@ export function Dashboard({
   const totalValue = cap.totalValue;
   const totalPnl   = cap.totalPnl;
   const isConnected = backendStatus === "connected";
+  const dayChange = finiteNumber(quote?.changePct ?? quote?.regularMarketChangePercent);
+  const dayHigh = finiteNumber(quote?.dayHigh ?? quote?.regularMarketDayHigh);
+  const dayLow = finiteNumber(quote?.dayLow ?? quote?.regularMarketDayLow);
+  const unrealisedPnl = finiteNumber(cap.unrealisedPnl);
+  const realisedPnl = finiteNumber(cap.realisedPnl);
+  const invested = finiteNumber(cap.invested);
+  const budget = finiteNumber(cap.budget);
+  const exposure = invested !== null && budget !== null && budget > 0
+    ? (invested / budget) * 100
+    : null;
+  const openPositions = botState == null
+    ? null
+    : Array.isArray(botState.openPosition)
+      ? botState.openPosition.length
+      : botState.openPosition
+        ? 1
+        : Array.isArray(botState.holdings)
+          ? botState.holdings.length
+          : null;
+  const closedTrades = finiteNumber(botState?.metrics?.closedTrades);
+  const wins = finiteNumber(botState?.metrics?.wins);
+  const losses = finiteNumber(botState?.metrics?.losses);
+  const fifteenMinSessions = finiteNumber(health?.readiness?.fifteenMinSessions);
+  const requiredSessions = finiteNumber(health?.readiness?.required);
+  const readinessPct = (
+    fifteenMinSessions !== null
+    && requiredSessions !== null
+    && requiredSessions > 0
+  )
+    ? Math.min(100, (fifteenMinSessions / requiredSessions) * 100)
+    : null;
 
   // Hero scroll parallax
   const scrollY      = useMotionValue(0);
@@ -248,36 +308,57 @@ export function Dashboard({
         <DataHealthPanel health={health} status={healthStatus} onRefresh={refreshHealth} />
       </div>
 
-      {/* ── SYSTEM MODULES ─────────────────────────────────────────── */}
-      <div className="module-glass-section mt-36 rounded-[36px] p-5 md:p-8">
-        <div className="module-glass-heading mb-10 max-w-xl rounded-[26px] p-7 md:p-9">
-          <Reveal>
-            <SceneHeading
-              label="System Modules"
-              title="How Spencer works"
-              sub="Eight principles that define the system's research and capital discipline."
-            />
-          </Reveal>
-        </div>
-        <BentoGrid onNavigate={(p) => { setActivePage(p); mainRef?.current?.scrollTo({ top: 0, behavior: "smooth" }); }} />
-      </div>
-
-      {/* ── RESEARCH CORE ──────────────────────────────────────────── */}
-      <div className="research-core-section relative mt-28 w-screen left-1/2 -translate-x-1/2 overflow-hidden py-28 md:py-36">
-        <div className="relative z-10 mx-auto max-w-[1480px] px-5 md:px-10">
-          <div className="liquid-glass-heading mb-12 max-w-xl rounded-[26px] p-7 md:p-9">
-            <Reveal>
-              <SceneHeading
-                label="Research Core"
-                title="The instrument panel"
-                sub="A fluid view of the research pipeline from observation to validation."
-              />
-            </Reveal>
-          </div>
-          <Reveal delay={0.1}>
-            <SpencerCore3D />
-          </Reveal>
-        </div>
+      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+        <DashboardMetric
+          label="RELIANCE day change"
+          value={signedPct(dayChange)}
+          detail="Latest real quote change"
+          tone={pnlTone(dayChange)}
+        />
+        <DashboardMetric
+          label="Day high / low"
+          value={dayHigh === null || dayLow === null ? "—" : `${money(dayHigh, 2)} / ${money(dayLow, 2)}`}
+          detail="Session range from quote"
+        />
+        <DashboardMetric
+          label="Unrealised P&L"
+          value={signedMoney(unrealisedPnl)}
+          detail="Open paper positions"
+          tone={pnlTone(unrealisedPnl)}
+        />
+        <DashboardMetric
+          label="Realised P&L"
+          value={signedMoney(realisedPnl)}
+          detail="Closed paper trades"
+          tone={pnlTone(realisedPnl)}
+        />
+        <DashboardMetric
+          label="Exposure"
+          value={exposure === null ? "—" : pct(exposure, 1)}
+          detail="Invested / paper budget"
+        />
+        <DashboardMetric
+          label="Open positions"
+          value={openPositions === null ? "—" : openPositions.toLocaleString("en-IN")}
+          detail="Current journal state"
+        />
+        <DashboardMetric
+          label="Closed trades"
+          value={closedTrades === null ? "—" : closedTrades.toLocaleString("en-IN")}
+          detail="Completed journal exits"
+        />
+        <DashboardMetric
+          label="Wins / losses"
+          value={wins === null || losses === null ? "—" : `${wins.toLocaleString("en-IN")} / ${losses.toLocaleString("en-IN")}`}
+          detail="Real closed-trade outcomes"
+        />
+        <DashboardMetric
+          label="SPNCR-003 readiness"
+          value={readinessPct === null ? "—" : pct(readinessPct, 0)}
+          detail={fifteenMinSessions === null || requiredSessions === null
+            ? "Data readiness unavailable"
+            : `${fifteenMinSessions} / ${requiredSessions} verified 15m sessions`}
+        />
       </div>
 
       {/* ── LIFETIME PERFORMANCE ───────────────────────────────────── */}
@@ -292,11 +373,6 @@ export function Dashboard({
           </Reveal>
         </div>
         <MetricsSection botState={botState} ledger={ledger} health={health} />
-      </div>
-
-      {/* ── SPENCER SYSTEM (moved to the bottom; dark, blends into footer) ─ */}
-      <div className="mt-36">
-        <ScrollStory mainRef={mainRef} quote={quote} botState={botState} ledger={ledger} />
       </div>
 
       {/* ── FOOTER (same #0a0a0a as the scroll section — seamless) ──────── */}

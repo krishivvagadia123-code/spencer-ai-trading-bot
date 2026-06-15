@@ -1,10 +1,11 @@
-import { X, LayoutDashboard, ListOrdered, Wallet, LineChart, IndianRupee, Gavel, BrainCircuit, FlaskConical, ShieldAlert, PieChart, User } from "lucide-react";
+import { X, LayoutDashboard, ListOrdered, IndianRupee, Gavel, BrainCircuit, ShieldAlert, User, CircleHelp } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 // Clubbed navigation: Orders also holds Holdings + Positions; Brain also holds
 // Research; Funds also holds Trade Tracker.
 const PAGES = [
   { id: "Dashboard", icon: LayoutDashboard },
+  { id: "WhatIsSpencer", label: "What is Spencer", icon: CircleHelp },
   { id: "Orders", icon: ListOrdered },
   { id: "Funds", icon: IndianRupee },
   { id: "Bids", icon: Gavel },
@@ -59,7 +60,7 @@ export function NavigationDrawer({ open, activePage, onNavigate, onClose }) {
               animate="visible"
               className="relative flex-1 overflow-y-auto p-4 z-10"
             >
-              {PAGES.map(({ id, icon: Icon }) => {
+              {PAGES.map(({ id, label, icon: Icon }) => {
                 const isActive = activePage === id;
                 return (
                   <motion.button
@@ -76,7 +77,7 @@ export function NavigationDrawer({ open, activePage, onNavigate, onClose }) {
                       />
                     )}
                     <Icon className={`h-4 w-4 ${isActive ? 'text-[var(--color-verified-accent)]' : 'group-hover:text-white'}`} />
-                    <span className="font-medium">{id}</span>
+                    <span className="font-medium">{label || id}</span>
                   </motion.button>
                 );
               })}

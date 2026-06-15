@@ -334,6 +334,15 @@ body {
     inset 0 1px 0 rgba(255, 255, 255, 0.88),
     inset 0 -1px 0 rgba(15, 23, 42, 0.09);
 }
+.data-health-panel {
+  isolation: auto;
+  background:
+    radial-gradient(circle at 12% 5%, rgba(255, 255, 255, 0.36), transparent 36%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.34), rgba(255, 255, 255, 0.12)),
+    rgba(224, 242, 254, 0.22);
+  backdrop-filter: blur(18px) saturate(165%) contrast(104%);
+  -webkit-backdrop-filter: blur(18px) saturate(165%) contrast(104%);
+}
 .story-scroll-track {
   height: calc(500dvh - 17.5rem);
   min-height: 3000px;
@@ -554,5 +563,9 @@ textarea {
   .liquid-glass-heading {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
+  }
+  .data-health-panel {
+    backdrop-filter: blur(12px) saturate(145%);
+    -webkit-backdrop-filter: blur(12px) saturate(145%);
   }
 }

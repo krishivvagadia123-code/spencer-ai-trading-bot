@@ -1,7 +1,7 @@
 import { ONE_STOCK_SYMBOL } from "../utils/constants";
 import { priceText } from "../utils/helpers";
 
-export function Header({ onMenuOpen, backendStatus, quote }) {
+export function Header({ onMenuOpen, onNavigate, backendStatus, quote }) {
   const isConnected = backendStatus === "connected";
   const isChecking = backendStatus === "checking";
   const marketOpen = String(quote?.marketState || "").toUpperCase() === "OPEN";
@@ -22,9 +22,17 @@ export function Header({ onMenuOpen, backendStatus, quote }) {
           <span className="block h-px w-[18px] bg-current" />
         </button>
 
+        <button
+          type="button"
+          onClick={() => onNavigate("WhatIsSpencer")}
+          className="glass-pill inline-flex px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition-colors hover:text-slate-950"
+        >
+          What is Spencer
+        </button>
+
         {/* Centered wordmark */}
         <div
-          className="logo-font absolute left-1/2 -translate-x-1/2 text-[22px]"
+          className="logo-font absolute left-1/2 hidden -translate-x-1/2 text-[22px] sm:block"
           style={{ color: "#0f172a" }}
         >
           Spencer
