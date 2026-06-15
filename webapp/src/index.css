@@ -362,9 +362,16 @@ body {
   backdrop-filter: blur(18px) saturate(165%) contrast(104%);
   -webkit-backdrop-filter: blur(18px) saturate(165%) contrast(104%);
 }
-.portfolio-chart-layer {
-  position: absolute !important;
-  z-index: 1 !important;
+.portfolio-chart-panel {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.48);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.56),
+    inset 0 -1px 0 rgba(15, 23, 42, 0.05);
 }
 .story-scroll-track {
   height: calc(500dvh - 17.5rem);
@@ -592,13 +599,7 @@ textarea {
     -webkit-backdrop-filter: blur(12px) saturate(145%);
   }
   .portfolio-glass {
-    padding-bottom: 17rem;
     backdrop-filter: blur(12px) saturate(145%);
     -webkit-backdrop-filter: blur(12px) saturate(145%);
-  }
-  .portfolio-chart-layer {
-    top: auto !important;
-    height: 14.5rem;
-    opacity: 0.72;
   }
 }

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { MetricsSection } from "../components/MetricsSection";
 import { DataHealthPanel } from "../components/DataHealthPanel";
@@ -138,6 +139,7 @@ export function Dashboard({
   refreshHealth,
   setActivePage,
 }) {
+  const [chartPoint, setChartPoint] = useState(null);
   const cap = botState?.capital || {};
   const totalValue = cap.totalValue;
   const totalPnl   = cap.totalPnl;
@@ -166,6 +168,7 @@ export function Dashboard({
   const losses = finiteNumber(botState?.metrics?.losses);
   const fifteenMinSessions = finiteNumber(health?.readiness?.fifteenMinSessions);
   const requiredSessions = finiteNumber(health?.readiness?.required);
+  const displayedReliancePrice = finiteNumber(chartPoint?.price) ?? finiteNumber(quote?.price);
   const readinessPct = (
     fifteenMinSessions !== null
     && requiredSessions !== null
@@ -198,14 +201,6 @@ export function Dashboard({
         />
 
         <div className="portfolio-glass liquid-glass-light relative overflow-hidden rounded-[28px] px-10 py-14 md:px-16 md:py-20">
-          {/* TradingView lightweight chart fed by Spencer's real quote API. */}
-          <div className="portfolio-chart-layer inset-x-0 bottom-0 top-1/3 opacity-[0.72] md:left-1/3">
-            <RelianceLiveChart
-              marketState={quote?.marketState}
-              marketStateLabel={quote?.marketStateLabel}
-            />
-          </div>
-
           <div className="relative z-10">
             {/* Row 1: label + pills */}
             <div className="mb-6 flex flex-wrap items-center gap-2.5">
@@ -219,69 +214,81 @@ export function Dashboard({
               <span className="pill pill-muted">Broker execution off</span>
             </div>
 
-            {/* Row 2: value + capital columns */}
-            <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between">
-              <div>
-                <div className="font-display tabular-nums leading-none" style={{ fontSize: "clamp(52px,8vw,96px)", fontWeight: 600, letterSpacing: "-0.03em" }}>
-                  {totalValue != null
-                    ? money(totalValue)
-                    : <span style={{ color: "var(--color-muted-dark-text)" }}>---</span>}
+            {/* Row 2: portfolio details and live chart */}
+            <div className="grid gap-10 xl:grid-cols-[minmax(0,0.85fr)_minmax(520px,1.15fr)] xl:items-stretch">
+              <div className="flex min-w-0 flex-col justify-between gap-10">
+                <div>
+                  <div className="font-display tabular-nums leading-none" style={{ fontSize: "clamp(52px,8vw,96px)", fontWeight: 600, letterSpacing: "-0.03em" }}>
+                    {totalValue != null
+                      ? money(totalValue)
+                      : <span style={{ color: "var(--color-muted-dark-text)" }}>---</span>}
+                  </div>
+                  <div className="mt-4 flex items-center gap-3">
+                    <span
+                      className="font-mono text-[15px] tabular-nums"
+                      style={{ color: totalPnl > 0 ? "var(--color-verified-accent)" : totalPnl < 0 ? "var(--color-failure-accent)" : "var(--color-muted-dark-text)" }}
+                    >
+                      {totalPnl != null ? `${pnlSign(totalPnl)}${money(totalPnl)}` : "---"}
+                    </span>
+                    <span className="text-[13px] text-[var(--color-muted-dark-text)]">{pct(cap.pnlPct)}</span>
+                  </div>
                 </div>
-                <div className="mt-4 flex items-center gap-3">
-                  <span
-                    className="font-mono text-[15px] tabular-nums"
-                    style={{ color: totalPnl > 0 ? "var(--color-verified-accent)" : totalPnl < 0 ? "var(--color-failure-accent)" : "var(--color-muted-dark-text)" }}
-                  >
-                    {totalPnl != null ? `${pnlSign(totalPnl)}${money(totalPnl)}` : "---"}
-                  </span>
-                  <span className="text-[13px] text-[var(--color-muted-dark-text)]">{pct(cap.pnlPct)}</span>
+
+                <div className="grid grid-cols-3 gap-5">
+                  {[
+                    { label: "Budget",    val: cap.budget   !== undefined ? money(cap.budget)   : "---" },
+                    { label: "Invested",  val: cap.invested !== undefined ? money(cap.invested) : "---" },
+                    { label: "Free Cash", val: cap.cash     !== undefined ? money(cap.cash)     : "---" },
+                  ].map((col, i) => (
+                    <motion.div
+                      key={col.label}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: 0.1 + i * 0.08, ease: EASE }}
+                    >
+                      <div className="mb-1.5 text-[11px] font-medium text-[var(--color-muted-dark-text)]">{col.label}</div>
+                      <div className="font-display text-[20px] font-semibold tabular-nums">{col.val}</div>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
 
-              <div className="flex items-center gap-8">
-                {[
-                  { label: "Budget",    val: cap.budget   !== undefined ? money(cap.budget)   : "---" },
-                  { label: "Invested",  val: cap.invested !== undefined ? money(cap.invested) : "---" },
-                  { label: "Free Cash", val: cap.cash     !== undefined ? money(cap.cash)     : "---" },
-                ].map((col, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.6, delay: 0.1 + i * 0.08, ease: EASE }}
-                  >
-                    <div className="mb-1.5 text-[11px] font-medium text-[var(--color-muted-dark-text)]">{col.label}</div>
-                    <div className="font-display text-[20px] font-semibold tabular-nums">{col.val}</div>
-                  </motion.div>
-                ))}
-
-                <div className="hidden md:flex flex-col items-center gap-1.5 pl-8 border-l border-[var(--color-light-border)]">
-                  <CapitalGuardRing invested={cap.invested} budget={cap.budget} />
-                  <span className="text-[10px] font-medium text-[var(--color-muted-dark-text)]">Guard</span>
-                </div>
+              <div className="portfolio-chart-panel min-h-[300px] min-w-0 rounded-[24px] px-3 pb-2 pt-10 md:min-h-[340px] md:px-4">
+                <RelianceLiveChart
+                  marketState={quote?.marketState}
+                  marketStateLabel={quote?.marketStateLabel}
+                  onLatestPoint={setChartPoint}
+                />
               </div>
             </div>
 
             {/* Row 3: status row */}
-            <div className="mt-10 pt-6 border-t border-[var(--color-light-border)] flex flex-wrap gap-6">
-              {[
-                { label: "RELIANCE",   val: quote?.price ? money(quote.price, 2) : "---" },
-                { label: "Candidates", val: String(ledger?.candidates?.length ?? "---") },
-                { label: "Brain",      val: botState?.regimeTrust ? "Active" : "Unavailable", accent: !!botState?.regimeTrust },
-              ].map((s, i) => (
-                <motion.div
-                  key={i}
-                  className="flex items-center gap-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.5, delay: 0.3 + i * 0.07 }}
+            <div className="mt-9 flex flex-wrap items-center gap-x-7 gap-y-3 border-t border-[var(--color-light-border)] pt-6">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-[var(--color-muted-dark-text)]">RELIANCE</span>
+                <span className="font-mono text-[13px] text-[var(--color-primary-dark-text)]">
+                  {displayedReliancePrice === null ? "—" : money(displayedReliancePrice, 2)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-[var(--color-muted-dark-text)]">Candidates</span>
+                <span className="font-mono text-[13px] text-[var(--color-primary-dark-text)]">
+                  {String(ledger?.candidates?.length ?? "—")}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-[var(--color-muted-dark-text)]">Brain</span>
+                <span
+                  className="font-mono text-[13px]"
+                  style={{ color: botState?.regimeTrust ? "var(--color-verified-accent)" : "var(--color-primary-dark-text)" }}
                 >
-                  <span className="text-[11px] font-medium text-[var(--color-muted-dark-text)]">{s.label}</span>
-                  <span className="font-mono text-[13px]" style={{ color: s.accent ? "var(--color-verified-accent)" : "var(--color-primary-dark-text)" }}>
-                    {s.val}
-                  </span>
-                </motion.div>
-              ))}
+                  {botState?.regimeTrust ? "Active" : "Unavailable"}
+                </span>
+              </div>
+              <div className="ml-auto hidden items-center gap-2 md:flex">
+                <CapitalGuardRing invested={cap.invested} budget={cap.budget} />
+                <span className="text-[10px] font-medium text-[var(--color-muted-dark-text)]">Capital guard</span>
+              </div>
             </div>
           </div>
         </div>

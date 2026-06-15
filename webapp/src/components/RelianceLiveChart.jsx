@@ -11,12 +11,18 @@ function marketLabel(marketState, marketStateLabel) {
   return "Status unavailable";
 }
 
-export function RelianceLiveChart({ marketState, marketStateLabel }) {
+export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint }) {
   const containerRef = useRef(null);
   const dotRef = useRef(null);
   const lastPointRef = useRef(null);
+  const onLatestPointRef = useRef(onLatestPoint);
   const [chartStatus, setChartStatus] = useState("loading");
+  const [latestPrice, setLatestPrice] = useState(null);
   const isMarketOpen = String(marketState || "").toUpperCase() === "OPEN";
+
+  useEffect(() => {
+    onLatestPointRef.current = onLatestPoint;
+  }, [onLatestPoint]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -86,6 +92,13 @@ export function RelianceLiveChart({ marketState, marketStateLabel }) {
         series.setData(points);
         chart.timeScale().fitContent();
         lastPointRef.current = points[points.length - 1];
+        onLatestPointRef.current?.({
+          price: lastPointRef.current.value,
+          timestamp: new Date(
+            (lastPointRef.current.time - IST_OFFSET_SECONDS) * 1000,
+          ).toISOString(),
+        });
+        setLatestPrice(lastPointRef.current.value);
         hasData = true;
         setChartStatus("ready");
 
@@ -175,9 +188,12 @@ export function RelianceLiveChart({ marketState, marketStateLabel }) {
 
   return (
     <div
-      className="reliance-live-chart relative h-full w-full"
+      className="reliance-live-chart relative h-full w-full min-w-0 overflow-hidden"
       role="img"
-      aria-label="RELIANCE five-minute market line chart"
+      aria-label={`RELIANCE five-minute market line chart${
+        latestPrice === null ? "" : `, latest price ₹${latestPrice.toFixed(2)}`
+      }`}
+      data-latest-price={latestPrice ?? ""}
     >
       <div ref={containerRef} className="h-full w-full" />
 
