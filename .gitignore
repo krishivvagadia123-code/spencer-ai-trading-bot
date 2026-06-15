@@ -105,3 +105,5 @@ frontend/dash_extracted.jsx
 frontend/.npm-cache/
 frontend/dist/
 frontend/dist-verify-bot-safety/
+webapp/node_modules/
+webapp/dist/
