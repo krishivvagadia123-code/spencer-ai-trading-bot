@@ -107,3 +107,6 @@ frontend/dist/
 frontend/dist-verify-bot-safety/
 webapp/node_modules/
 webapp/dist/
+
+# Obsidian per-user workspace config inside the brain vault
+brain/.obsidian/

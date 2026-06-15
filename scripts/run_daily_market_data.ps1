@@ -7,6 +7,7 @@ $IntradayScript = Join-Path $ProjectRoot "scripts\intraday_history.py"
 $AuditScript = Join-Path $ProjectRoot "scripts\audit_data_integrity.py"
 $AuditLogScript = Join-Path $ProjectRoot "scripts\append_daily_audit.py"
 $AuditLog = Join-Path $ProjectRoot "workflow\logs\daily_audit.log"
+$BrainScript = Join-Path $ProjectRoot "scripts\export_brain.py"
 
 Set-Location $ProjectRoot
 
@@ -27,6 +28,13 @@ $AuditJson | & $PythonExe $AuditLogScript --log $AuditLog --audit-exit-code $Aud
 
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "Data-integrity audit result could not be appended to $AuditLog"
+}
+
+# Refresh the Obsidian brain vault from the latest state (read-only over the DB;
+# best-effort — a brain-export hiccup never fails the data job).
+& $PythonExe $BrainScript
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Brain export did not complete cleanly."
 }
 
 # Integrity failures are reported as ALERT lines but do not turn a successful
