@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { motion, useMotionValue, useTransform, useSpring } from "motion/react";
+import { motion } from "motion/react";
 import { MetricsSection } from "../components/MetricsSection";
 import { DataHealthPanel } from "../components/DataHealthPanel";
 import { money, pct, pnlSign, pnlTone } from "../utils/helpers";
@@ -174,27 +173,12 @@ export function Dashboard({
     ? Math.min(100, (fifteenMinSessions / requiredSessions) * 100)
     : null;
 
-  // Hero scroll parallax
-  const scrollY      = useMotionValue(0);
-  useEffect(() => {
-    const el = mainRef?.current;
-    if (!el) return;
-    const fn = () => scrollY.set(el.scrollTop);
-    el.addEventListener("scroll", fn, { passive: true });
-    return () => el.removeEventListener("scroll", fn);
-  }, [mainRef, scrollY]);
-
-  const heroOpacity = useSpring(useTransform(scrollY, [0, 500], [1, 0]),   { stiffness: 70, damping: 18 });
-  const heroY       = useSpring(useTransform(scrollY, [0, 500], [0, -32]), { stiffness: 70, damping: 18 });
-
   return (
     <div className="-mb-6 md:-mb-10">
 
       {/* ── HERO ───────────────────────────────────────────────────── */}
-      <motion.div
-        style={{ opacity: heroOpacity, y: heroY }}
-      >
-        {/* Depth blob — moves slightly slower (parallax) */}
+      <div>
+        {/* Static depth blobs behind the portfolio glass */}
         <motion.div
           className="absolute pointer-events-none"
           style={{
@@ -212,7 +196,7 @@ export function Dashboard({
           }}
         />
 
-        <div className="liquid-glass-light relative overflow-hidden rounded-[28px] px-10 py-14 md:px-16 md:py-20">
+        <div className="portfolio-glass liquid-glass-light relative overflow-hidden rounded-[28px] px-10 py-14 md:px-16 md:py-20">
           {/* Ghost RELIANCE */}
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden">
             <span
@@ -302,7 +286,7 @@ export function Dashboard({
             </div>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       <div className="mt-8">
         <DataHealthPanel health={health} status={healthStatus} onRefresh={refreshHealth} />
@@ -377,7 +361,7 @@ export function Dashboard({
 
       {/* ── FOOTER (same #0a0a0a as the scroll section — seamless) ──────── */}
       <footer
-        className="glass-footer px-5 pt-14 pb-10 md:px-10"
+        className="glass-footer mt-28 px-5 pt-14 pb-10 md:mt-36 md:px-10"
         style={{ width: "100vw", position: "relative", left: "50%", marginLeft: "-50vw" }}
       >
         <div className="mx-auto max-w-[1480px]">
