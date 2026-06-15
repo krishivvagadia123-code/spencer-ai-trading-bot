@@ -59,6 +59,7 @@ export default function App() {
       <Header
         onMenuOpen={() => setMenuOpen(true)}
         onNavigate={navigate}
+        onChatOpen={() => setChatOpen(true)}
         backendStatus={backendStatus}
         quote={quote}
       />

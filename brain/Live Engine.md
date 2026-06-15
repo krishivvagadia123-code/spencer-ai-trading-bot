@@ -1,13 +1,13 @@
 ---
 tags: [spencer, engine]
-updated: 2026-06-15T15:20+05:30
+updated: 2026-06-15T18:00+05:30
+managed: true
+source_path: "scripts/export_brain.py"
 ---
-# ⚙️ Live Paper-Trading Engine
+# ⚙️ Live Paper Engine
 
 Status: **DORMANT** — no candidate has passed the ladder yet.
 
-The engine paper-trades an approved candidate forward, identically to how it
-backtested. It refuses to run a killed or unproven candidate and never places a
-real order. It activates the day a candidate in the [[Research Ledger]] passes.
-
+See the component note [[Live Paper Engine]]. It activates the day a candidate in
+the [[Research Ledger]] clears [[Walk-Forward]], and obeys the [[Deployment Gate]].
 Back to [[Spencer]].

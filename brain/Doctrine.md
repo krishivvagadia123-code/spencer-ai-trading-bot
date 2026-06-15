@@ -1,18 +1,17 @@
 ---
 tags: [spencer, doctrine]
-updated: 2026-06-15T15:20+05:30
+updated: 2026-06-15T18:00+05:30
+managed: true
+source_path: "scripts/export_brain.py"
 ---
 # 📜 Doctrine
 
-- **One stock:** RELIANCE only, until mastered.
-- **₹5,000** fixed paper capital. Max one open position.
+- **One stock:** [[RELIANCE]] only, until [[Mastery]] (see [[One-Stock Doctrine]]).
+- **₹5,000** fixed [[Paper Capital]]; max one open position.
 - **Zero fake data** — every shown number traces to a real trade, quote, or
   documented calculation.
-- **Paper-only**; live trading and broker execution stay blocked until research
-  validation passes.
-- **Confirm-or-kill:** a technique must survive in-sample → out-of-sample →
-  walk-forward, after costs, before it may paper-trade.
+- **Paper-only**; live trading stays behind the [[Deployment Gate]].
+- **[[Confirm-or-Kill]]:** survive [[In-Sample]] → [[Out-of-Sample]] →
+  [[Walk-Forward]] after the [[Cost Bar]], or be killed.
 
-Full text lives in the repo: `SPENCER_CONCEPT.md` and `RESEARCH_PROTOCOL.md`.
-
-Back to [[Spencer]].
+Full text: `SPENCER_CONCEPT.md` and `RESEARCH_PROTOCOL.md`. Back to [[Spencer]].

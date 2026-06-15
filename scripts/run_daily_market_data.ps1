@@ -30,7 +30,7 @@ if ($LASTEXITCODE -ne 0) {
     Write-Warning "Data-integrity audit result could not be appended to $AuditLog"
 }
 
-# Refresh the Obsidian brain vault from the latest state (read-only over the DB;
+# Refresh the Obsidian primary brain from the latest state (read-only over the DB;
 # best-effort — a brain-export hiccup never fails the data job).
 & $PythonExe $BrainScript
 if ($LASTEXITCODE -ne 0) {

@@ -63,7 +63,8 @@ def test_export_brain_builds_linked_vault_from_real_data(tmp_path):
 
     # Core notes exist
     for note in ("Spencer.md", "Scoreboard.md", "Research Ledger.md",
-                 "Data & Readiness.md", "Live Engine.md", "Doctrine.md", "SPNCR-T.md"):
+                 "Data & Readiness.md", "Live Engine.md", "Doctrine.md", "SPNCR-T.md",
+                 "Primary Brain.md", "Reference Index.md", "Safety Boundaries.md"):
         assert (brain / note).exists(), f"missing {note}"
 
     # Real scoreboard number rendered, and wikilinks present (graph works)
@@ -86,6 +87,25 @@ def test_export_brain_builds_linked_vault_from_real_data(tmp_path):
     assert result["candidates"] == 1
     assert all((brain / n).resolve().is_relative_to(brain.resolve())
                for n in result["notes"])
+    assert (brain / ".spencer-brain-index.json").exists()
+    assert (brain / "Spencer System.canvas").exists()
+
+
+def test_export_preserves_manual_memory(tmp_path):
+    db = tmp_path / "empty.db"
+    sqlite3.connect(db).close()
+    brain = tmp_path / "brain"
+    memory = brain / "Memory" / "Decisions" / "operator-decision.md"
+    memory.parent.mkdir(parents=True)
+    memory.write_text("# Operator decision\n\nNever overwrite this.\n", encoding="utf-8")
+
+    export_brain.export_brain(
+        db_path=db,
+        scoreboard_path=tmp_path / "none.json",
+        brain_dir=brain,
+    )
+
+    assert memory.read_text(encoding="utf-8") == "# Operator decision\n\nNever overwrite this.\n"
 
 
 def test_export_brain_handles_empty_journal(tmp_path):

@@ -110,3 +110,4 @@ webapp/dist/
 
 # Obsidian per-user workspace config inside the brain vault
 brain/.obsidian/
+brain/.spencer-brain-index.json

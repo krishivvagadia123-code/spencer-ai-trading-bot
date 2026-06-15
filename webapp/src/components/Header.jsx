@@ -1,7 +1,8 @@
+import { BrainCircuit } from "lucide-react";
 import { ONE_STOCK_SYMBOL } from "../utils/constants";
 import { priceText } from "../utils/helpers";
 
-export function Header({ onMenuOpen, onNavigate, backendStatus, quote }) {
+export function Header({ onMenuOpen, onNavigate, onChatOpen, backendStatus, quote }) {
   const isConnected = backendStatus === "connected";
   const isChecking = backendStatus === "checking";
   const marketOpen = String(quote?.marketState || "").toUpperCase() === "OPEN";
@@ -73,6 +74,15 @@ export function Header({ onMenuOpen, onNavigate, backendStatus, quote }) {
           <span className="glass-pill hidden px-3 py-1.5 text-[10px] font-semibold text-blue-700 md:inline">Paper mode</span>
           <span className="glass-pill hidden px-3 py-1.5 text-[10px] font-semibold text-rose-700 lg:inline">Live trading off</span>
           <span className="glass-pill hidden px-3 py-1.5 text-[10px] font-semibold text-slate-700 lg:inline">Broker execution off</span>
+
+          <button
+            type="button"
+            onClick={onChatOpen}
+            className="glass-pill inline-flex h-9 items-center gap-2 px-3 text-[11px] font-semibold text-slate-800"
+          >
+            <BrainCircuit className="h-4 w-4" />
+            <span className="hidden xl:inline">Ask brain</span>
+          </button>
 
           <button
             onClick={onMenuOpen}

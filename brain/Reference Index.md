@@ -1,0 +1,60 @@
+---
+tags: [spencer, reference, moc]
+updated: 2026-06-15T18:00+05:30
+managed: true
+source_path: "scripts/export_brain.py"
+---
+# Reference Index
+
+Canonical project documents mirrored into the primary brain.
+
+- [[Reference/Governance/SPENCER_CONCEPT]]
+- [[Reference/Governance/RESEARCH_PROTOCOL]]
+- [[Reference/Operations/PROJECT_STATUS]]
+- [[Reference/Research/MASTERY_LEDGER]]
+- [[Reference/Research/MISTAKE_REVIEW]]
+- [[Reference/Research/DATA_SOURCE_RESEARCH_PLAN]]
+- [[Reference/Operations/AUDIT_REPORT]]
+- [[Reference/Operations/OBSIDIAN_BRAIN]]
+- [[Reference/Research/RELIANCE_COST_MATH]]
+- [[Reference/Workflow/Current Task]]
+- [[Reference/Workflow/Latest Result]]
+- [[Reference/Workflow/Review Packet]]
+- [[Reference/Candidates/SPNCR-001]]
+- [[Reference/Candidates/SPNCR-002]]
+- [[Reference/Research Evidence/day_selection_evidence_2026-06-12]]
+- [[Reference/Research Evidence/volatility_persistence_eda]]
+- [[Reference/Workflow Tasks/api_health_readiness]]
+- [[Reference/Workflow Tasks/automate_daily_audit]]
+- [[Reference/Workflow Tasks/backtest_context_fields]]
+- [[Reference/Workflow Tasks/blockdeals_data_access]]
+- [[Reference/Workflow Tasks/blockdeals_manual_history]]
+- [[Reference/Workflow Tasks/confirm_gap_up_edge]]
+- [[Reference/Workflow Tasks/current_task]]
+- [[Reference/Workflow Tasks/daily_price_snapshot]]
+- [[Reference/Workflow Tasks/data_integrity_audit]]
+- [[Reference/Workflow Tasks/event_eval_gap_up_scan]]
+- [[Reference/Workflow Tasks/gdelt_rate_limit_and_history]]
+- [[Reference/Workflow Tasks/glass_ui_polish]]
+- [[Reference/Workflow Tasks/intraday_backtest_harness]]
+- [[Reference/Workflow Tasks/live_paper_execution_engine]]
+- [[Reference/Workflow Tasks/one_stock_reliance_reset]]
+- [[Reference/Workflow Tasks/record_blockdeal_eval_rejection]]
+- [[Reference/Workflow Tasks/record_delivery_eval_rejection]]
+- [[Reference/Workflow Tasks/record_flows_eval_rejection]]
+- [[Reference/Workflow Tasks/record_news_sentiment_eval_rejection]]
+- [[Reference/Workflow Tasks/reliance_intraday_history]]
+- [[Reference/Workflow Tasks/research_block_deals]]
+- [[Reference/Workflow Tasks/research_delivery_volume]]
+- [[Reference/Workflow Tasks/research_fii_dii_flows]]
+- [[Reference/Workflow Tasks/research_ledger_panel]]
+- [[Reference/Workflow Tasks/research_news_sentiment_gdelt]]
+- [[Reference/Workflow Tasks/scope_gdelt_gkg_history]]
+- [[Reference/Workflow Tasks/status_cli]]
+- [[Reference/Agents/antigravity_designer]]
+- [[Reference/Agents/claude_manager]]
+- [[Reference/Agents/codex_builder]]
+- [[Reference/Agents/gpt_reviewer]]
+- [[Reference/Agents/trading_authority]]
+
+Back to [[Spencer]].

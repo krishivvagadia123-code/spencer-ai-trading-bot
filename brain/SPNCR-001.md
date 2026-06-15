@@ -1,7 +1,8 @@
 ---
 tags: [spencer, candidate]
-verdict: KILLED
-updated: 2026-06-15T15:20+05:30
+updated: 2026-06-15T18:00+05:30
+managed: true
+source_path: "scripts/export_brain.py"
 ---
 # SPNCR-001 (v1) — KILLED
 
@@ -13,4 +14,5 @@ updated: 2026-06-15T15:20+05:30
 |---|---|---|---|
 | IN_SAMPLE | FAIL | 28 | -45.53 |
 
+Measured against the [[Cost Bar]] across [[In-Sample]] → [[Out-of-Sample]] → [[Walk-Forward]].
 Part of the [[Research Ledger]] · back to [[Spencer]].
