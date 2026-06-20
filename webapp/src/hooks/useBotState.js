@@ -41,7 +41,9 @@ export function useBotState(profile) {
 
     poll();
     pushConfig();
-    const timer = setInterval(poll, 5000);
+    // Paper-only bot state changes slowly; a 5s poll forced constant re-renders
+    // (and re-composited the glass UI). 30s is plenty and much smoother.
+    const timer = setInterval(poll, 30000);
     return () => { cancelled = true; clearInterval(timer); };
   }, [profile?.budget]);
 
