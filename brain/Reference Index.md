@@ -1,6 +1,6 @@
 ---
 tags: [spencer, reference, moc]
-updated: 2026-06-15T18:00+05:30
+updated: 2026-06-20T17:46+05:30
 managed: true
 source_path: "scripts/export_brain.py"
 ---
@@ -15,6 +15,7 @@ Canonical project documents mirrored into the primary brain.
 - [[Reference/Research/MISTAKE_REVIEW]]
 - [[Reference/Research/DATA_SOURCE_RESEARCH_PLAN]]
 - [[Reference/Operations/AUDIT_REPORT]]
+- [[Reference/Operations/UNATTENDED_BACKEND]]
 - [[Reference/Operations/OBSIDIAN_BRAIN]]
 - [[Reference/Research/RELIANCE_COST_MATH]]
 - [[Reference/Workflow/Current Task]]
