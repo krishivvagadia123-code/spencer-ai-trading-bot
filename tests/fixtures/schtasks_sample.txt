@@ -1,0 +1,41 @@
+Folder: \
+HostName:                             DESKTOP-SPENCER
+TaskName:                             \SpencerIntradayCollect
+Next Run Time:                        6/22/2026 9:30:00 AM
+Status:                               Ready
+Logon Mode:                           Interactive/Background
+Last Run Time:                        6/19/2026 3:30:00 PM
+Last Result:                          0
+Author:                               DESKTOP-SPENCER\krish
+Task To Run:                          C:\Users\krish\OneDrive\Desktop\AI TRADE\.venv\Scripts\python.exe scripts\intraday_history.py
+Start In:                             C:\Users\krish\OneDrive\Desktop\AI TRADE
+Comment:                              Spencer intraday 15m collector
+Scheduled Task State:                 Enabled
+
+Folder: \
+HostName:                             DESKTOP-SPENCER
+TaskName:                             \SpencerDailySnapshot
+Next Run Time:                        6/20/2026 6:00:00 PM
+Status:                               Ready
+Logon Mode:                           Interactive/Background
+Last Run Time:                        6/19/2026 6:00:03 PM
+Last Result:                          0x0
+Author:                               DESKTOP-SPENCER\krish
+Task To Run:                          powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts\run_daily_market_data.ps1
+Start In:                             C:\Users\krish\OneDrive\Desktop\AI TRADE
+Comment:                              Spencer daily market data
+Scheduled Task State:                 Enabled
+
+Folder: \
+HostName:                             DESKTOP-SPENCER
+TaskName:                             \SpencerDryRun
+Next Run Time:                        6/22/2026 4:00:00 PM
+Status:                               Ready
+Logon Mode:                           Interactive/Background
+Last Run Time:                        6/19/2026 4:00:01 PM
+Last Result:                          1
+Author:                               DESKTOP-SPENCER\krish
+Task To Run:                          C:\Users\krish\OneDrive\Desktop\AI TRADE\.venv\Scripts\python.exe scripts\run_live_paper.py --mode dry-run
+Start In:                             C:\Users\krish\OneDrive\Desktop\AI TRADE
+Comment:                              Spencer dry run
+Scheduled Task State:                 Enabled
