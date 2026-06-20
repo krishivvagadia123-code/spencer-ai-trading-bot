@@ -111,3 +111,6 @@ webapp/dist/
 # Obsidian per-user workspace config inside the brain vault
 brain/.obsidian/
 brain/.spencer-brain-index.json
+
+# Generated agent analysis output (runtime data, not source)
+workflow/analysis_latest.json

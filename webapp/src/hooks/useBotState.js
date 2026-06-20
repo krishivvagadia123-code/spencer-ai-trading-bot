@@ -30,7 +30,10 @@ export function useBotState(profile) {
       try {
         await fetch(`${SPENCER_API_BASE}/api/bot/config`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Spencer-Token": import.meta.env.VITE_SPENCER_API_TOKEN || "",
+          },
           body: JSON.stringify({ budget: 5000, symbol: ONE_STOCK_SYMBOL }),
         });
       } catch {}

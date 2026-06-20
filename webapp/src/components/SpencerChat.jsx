@@ -24,7 +24,12 @@ export function SpencerChat({ open, onClose }) {
     try {
       const response = await fetch(`${SPENCER_API_BASE}/api/ai/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Local dev sends the token (from webapp/.env); the public Vercel
+          // build has none, so the public chat box is intentionally inert.
+          "X-Spencer-Token": import.meta.env.VITE_SPENCER_API_TOKEN || "",
+        },
         body: JSON.stringify({ prompt, temperature: 0.2, maxOutputTokens: 700 }),
       });
       const data = await response.json();

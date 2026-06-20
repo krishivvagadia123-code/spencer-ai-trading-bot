@@ -8,6 +8,7 @@ after market close without needing yfinance or pandas installed locally.
 
 from __future__ import annotations
 
+import hmac
 import json
 import os
 import sqlite3
@@ -55,7 +56,7 @@ def _json(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
     handler.send_header("Content-Type", "application/json; charset=utf-8")
     handler.send_header("Access-Control-Allow-Origin", "*")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type, X-Spencer-Confirm")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type, X-Spencer-Confirm, X-Spencer-Token")
     handler.send_header("Cache-Control", "no-store")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
@@ -104,6 +105,25 @@ def _trusted_local_origin(handler: BaseHTTPRequestHandler) -> bool:
         return urlparse(origin).hostname in {"127.0.0.1", "localhost", "::1"}
     except ValueError:
         return False
+
+
+def _valid_api_token(handler: BaseHTTPRequestHandler) -> bool:
+    """True only if the request carries the configured SPENCER_API_TOKEN.
+
+    Gates the mutating endpoints. The token lives in backend/.env (and, for the
+    local dev site, webapp/.env as VITE_SPENCER_API_TOKEN) and is NEVER set on
+    the public Vercel deployment — so a random visitor who finds the tunnel URL
+    cannot start/stop the bot or spend the Gemini key. A local-origin check is
+    deliberately NOT accepted here: behind the Cloudflare tunnel every request
+    appears to come from localhost, so only the shared token is trustworthy.
+    """
+    configured = _env_value("SPENCER_API_TOKEN")
+    if not configured:
+        return False
+    provided = (handler.headers.get("X-Spencer-Token") or "").strip()
+    if not provided:
+        return False
+    return hmac.compare_digest(provided, configured)
 
 
 def _query_int(qs: dict, name: str, default: int, minimum: int, maximum: int) -> int:
@@ -1304,6 +1324,9 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/api/ai/chat":
+            if not _valid_api_token(self):
+                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+                return
             payload = _read_json_body(self)
             prompt = str(payload.get("prompt") or "").strip()
             if not prompt:
@@ -1345,15 +1368,24 @@ class Handler(BaseHTTPRequestHandler):
             _json(self, 200, _brain().write_index())
             return
         if parsed.path == "/api/bot/start":
+            if not _valid_api_token(self):
+                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+                return
             _json(self, 200, {"ok": True, "bot": _start_bot_loop()})
             return
         if parsed.path == "/api/bot/status":
             _json(self, 200, {"ok": True, "bot": _bot_status()})
             return
         if parsed.path == "/api/bot/stop":
+            if not _valid_api_token(self):
+                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+                return
             _json(self, 200, _stop_bot_loop())
             return
         if parsed.path == "/api/bot/config":
+            if not _valid_api_token(self):
+                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+                return
             payload = _read_json_body(self)
             _json(self, 200, _set_budget(payload.get("budget", 5000.0)))
             return
