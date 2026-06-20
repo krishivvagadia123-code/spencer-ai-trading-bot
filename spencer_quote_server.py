@@ -1,4 +1,4 @@
-"""
+﻿"""
 Local quote, chart, and research server for Spencer AI.
 
 This is read-only. It never places orders. It uses Yahoo Finance's public
@@ -48,15 +48,31 @@ _BOT_STATE = {
     "lastError": None,
     "runCount": 0,
 }
+ALLOWED_CORS_ORIGINS = {
+    "https://spencer-ai-trading-bot.vercel.app",
+    "http://localhost:5180",
+    "http://127.0.0.1:5180",
+}
+PROTECTED_POST_ERROR = "this endpoint requires a valid X-Spencer-Confirm"
+
+
+def _cors_origin(handler: BaseHTTPRequestHandler) -> str | None:
+    origin = (handler.headers.get("Origin") or "").strip().rstrip("/")
+    if origin in ALLOWED_CORS_ORIGINS:
+        return origin
+    return None
 
 
 def _json(handler: BaseHTTPRequestHandler, status: int, payload: dict) -> None:
     body = json.dumps(payload, default=str).encode("utf-8")
     handler.send_response(status)
     handler.send_header("Content-Type", "application/json; charset=utf-8")
-    handler.send_header("Access-Control-Allow-Origin", "*")
+    cors_origin = _cors_origin(handler)
+    if cors_origin:
+        handler.send_header("Access-Control-Allow-Origin", cors_origin)
+        handler.send_header("Vary", "Origin")
     handler.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-    handler.send_header("Access-Control-Allow-Headers", "Content-Type, X-Spencer-Confirm, X-Spencer-Token")
+    handler.send_header("Access-Control-Allow-Headers", "Content-Type, X-Spencer-Confirm")
     handler.send_header("Cache-Control", "no-store")
     handler.send_header("Content-Length", str(len(body)))
     handler.end_headers()
@@ -107,20 +123,12 @@ def _trusted_local_origin(handler: BaseHTTPRequestHandler) -> bool:
         return False
 
 
-def _valid_api_token(handler: BaseHTTPRequestHandler) -> bool:
-    """True only if the request carries the configured SPENCER_API_TOKEN.
-
-    Gates the mutating endpoints. The token lives in backend/.env (and, for the
-    local dev site, webapp/.env as VITE_SPENCER_API_TOKEN) and is NEVER set on
-    the public Vercel deployment — so a random visitor who finds the tunnel URL
-    cannot start/stop the bot or spend the Gemini key. A local-origin check is
-    deliberately NOT accepted here: behind the Cloudflare tunnel every request
-    appears to come from localhost, so only the shared token is trustworthy.
-    """
-    configured = _env_value("SPENCER_API_TOKEN")
+def _valid_write_token(handler: BaseHTTPRequestHandler) -> bool:
+    """True only if the request carries the configured SPENCER_WRITE_TOKEN."""
+    configured = _env_value("SPENCER_WRITE_TOKEN")
     if not configured:
         return False
-    provided = (handler.headers.get("X-Spencer-Token") or "").strip()
+    provided = (handler.headers.get("X-Spencer-Confirm") or "").strip()
     if not provided:
         return False
     return hmac.compare_digest(provided, configured)
@@ -1324,8 +1332,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path == "/api/ai/chat":
-            if not _valid_api_token(self):
-                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
                 return
             payload = _read_json_body(self)
             prompt = str(payload.get("prompt") or "").strip()
@@ -1340,8 +1348,8 @@ class Handler(BaseHTTPRequestHandler):
             _json(self, 200 if result.get("ok") else int(result.get("status") or 500), result)
             return
         if parsed.path == "/api/brain/capture":
-            if not _trusted_local_origin(self):
-                _json(self, 403, {"ok": False, "error": "Brain writes are restricted to local callers"})
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
                 return
             payload = _read_json_body(self)
             if payload.get("confirmed") is not True:
@@ -1362,14 +1370,14 @@ class Handler(BaseHTTPRequestHandler):
             _json(self, 201, {"ok": True, **result})
             return
         if parsed.path == "/api/brain/reindex":
-            if not _trusted_local_origin(self):
-                _json(self, 403, {"ok": False, "error": "Brain writes are restricted to local callers"})
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
                 return
             _json(self, 200, _brain().write_index())
             return
         if parsed.path == "/api/bot/start":
-            if not _valid_api_token(self):
-                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
                 return
             _json(self, 200, {"ok": True, "bot": _start_bot_loop()})
             return
@@ -1377,19 +1385,22 @@ class Handler(BaseHTTPRequestHandler):
             _json(self, 200, {"ok": True, "bot": _bot_status()})
             return
         if parsed.path == "/api/bot/stop":
-            if not _valid_api_token(self):
-                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
                 return
             _json(self, 200, _stop_bot_loop())
             return
         if parsed.path == "/api/bot/config":
-            if not _valid_api_token(self):
-                _json(self, 403, {"ok": False, "error": "this endpoint requires a valid X-Spencer-Token"})
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
                 return
             payload = _read_json_body(self)
             _json(self, 200, _set_budget(payload.get("budget", 5000.0)))
             return
         if parsed.path == "/api/bot/reset":
+            if not _valid_write_token(self):
+                _json(self, 403, {"ok": False, "error": PROTECTED_POST_ERROR})
+                return
             # Intentionally does NOT wipe the journal — that is the real record.
             _json(self, 200, {"ok": True,
                               "note": "reset is a no-op; the paper journal is preserved."})
@@ -1485,3 +1496,4 @@ if __name__ == "__main__":
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print(f"Spencer quote server running at http://127.0.0.1:{PORT}")
     server.serve_forever()
+

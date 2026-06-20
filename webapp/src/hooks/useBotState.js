@@ -32,7 +32,7 @@ export function useBotState(profile) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Spencer-Token": import.meta.env.VITE_SPENCER_API_TOKEN || "",
+            "X-Spencer-Confirm": import.meta.env.VITE_SPENCER_WRITE_TOKEN || "",
           },
           body: JSON.stringify({ budget: 5000, symbol: ONE_STOCK_SYMBOL }),
         });
