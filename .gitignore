@@ -117,3 +117,8 @@ workflow/analysis_latest.json
 
 # Local archive of stale artifacts (not source)
 archive/
+
+# Generated daily brain snapshots (regenerable; avoid daily churn)
+brain/Daily/
+# Obsidian scratch artifacts in the vault
+brain/Untitled.*
