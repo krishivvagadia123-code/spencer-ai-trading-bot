@@ -15,7 +15,7 @@ import subprocess
 import sys
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
@@ -23,6 +23,7 @@ from urllib.request import Request, urlopen
 
 from bot.config import ONE_STOCK_UNIVERSE
 from bot.governance import build_action_capabilities, build_governance_snapshot
+from bot.holidays import is_nse_holiday
 from bot.market_data import IST
 from bot.obsidian_brain import ObsidianBrain
 
@@ -402,6 +403,7 @@ def _handoff_payload() -> dict:
             "quotes": "/api/quotes?symbols=RELIANCE",
             "chart": "/api/chart?symbol=RELIANCE&interval=5m",
             "health": "GET /api/health",
+            "analysis": "GET /api/analysis",
             "research": "/api/research?symbols=RELIANCE",
             "researchLedger": "GET /api/research/ledger",
             "brainStatus": "GET /api/brain/status",
@@ -546,6 +548,7 @@ WORKFLOW_DEPLOYMENT_GATE_PATH = WORKFLOW_DIR / "deployment_gate.json"
 WORKFLOW_AGENT_POLICY_PATH = WORKFLOW_DIR / "agents" / "agent_policy.json"
 WORKFLOW_SCOREBOARD_PATH = WORKFLOW_DIR / "scoreboard.json"
 WORKFLOW_DAILY_AUDIT_LOG_PATH = WORKFLOW_LOGS_DIR / "daily_audit.log"
+WORKFLOW_ANALYSIS_LATEST_PATH = WORKFLOW_DIR / "analysis_latest.json"
 
 
 def _state_json(conn: sqlite3.Connection, key: str, default=None):
@@ -661,6 +664,51 @@ def _load_json_file(path: Path):
         return json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return None
+
+
+def _parse_date(value) -> date | None:
+    if not value:
+        return None
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _latest_nse_trading_day(reference: date | None = None) -> date:
+    current = reference or datetime.now(IST).date()
+    while current.weekday() >= 5 or is_nse_holiday(current):
+        current -= timedelta(days=1)
+    return current
+
+
+def _analysis_payload(
+    analysis_path: Path | None = None,
+    *,
+    latest_trading_day: date | None = None,
+) -> dict:
+    path = analysis_path or WORKFLOW_ANALYSIS_LATEST_PATH
+    payload = _load_json_file(path)
+    if not isinstance(payload, dict):
+        return {
+            "rating": None,
+            "executive_summary": "no analysis yet",
+            "time_horizon": None,
+            "analysis_date": None,
+            "generated_at": None,
+            "is_stale": True,
+        }
+
+    analysis_date = _parse_date(payload.get("analysis_date"))
+    latest = latest_trading_day or _latest_nse_trading_day()
+    return {
+        "rating": payload.get("rating"),
+        "executive_summary": payload.get("executive_summary") or "no analysis yet",
+        "time_horizon": payload.get("time_horizon"),
+        "analysis_date": analysis_date.isoformat() if analysis_date else None,
+        "generated_at": payload.get("generated_at"),
+        "is_stale": True if analysis_date is None else analysis_date < latest,
+    }
 
 
 def _last_daily_audit(log_path: Path | None = None) -> dict | None:
@@ -1335,6 +1383,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/health":
                 _json(self, 200, _health_payload())
+                return
+            if parsed.path == "/api/analysis":
+                _json(self, 200, _analysis_payload())
                 return
             if parsed.path == "/api/research/ledger":
                 _json(self, 200, _research_ledger())
