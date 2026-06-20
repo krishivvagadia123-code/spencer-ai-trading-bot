@@ -4,6 +4,11 @@
 #
 # The collector is idempotent and only stores final, boundary-aligned candles,
 # so extra runs are harmless. Operator action: run this once.
+#
+# IMPORTANT (fixed 2026-06-20): the task MUST be allowed to run on battery and to
+# catch up missed runs. The default Task Scheduler settings refuse to start on
+# battery (error 0x800710E0 "operator refused the request") and never retry, which
+# silently skipped collection on 2026-06-18/19 while the laptop was unplugged.
 
 $ErrorActionPreference = "Stop"
 
@@ -26,10 +31,19 @@ $Trigger.Repetition = (New-ScheduledTaskTrigger -Once -At "09:30" `
     -RepetitionInterval (New-TimeSpan -Minutes 30) `
     -RepetitionDuration (New-TimeSpan -Hours 6)).Repetition
 
+# Battery-resilient: run on battery, don't stop on unplug, catch up a missed
+# start, and wake the machine if asleep. Without these the run is refused.
+$Settings = New-ScheduledTaskSettingsSet `
+    -AllowStartIfOnBatteries `
+    -DontStopIfGoingOnBatteries `
+    -StartWhenAvailable `
+    -WakeToRun
+
 Register-ScheduledTask `
     -TaskName $TaskName `
     -Action $Action `
     -Trigger $Trigger `
+    -Settings $Settings `
     -Description "Spencer intraday 15m collector - every 30 min during market hours (paper-only research)." `
     -Force | Out-Null
 
