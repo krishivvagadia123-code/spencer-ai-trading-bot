@@ -225,6 +225,7 @@ REFERENCE_FILES = {
     "MISTAKE_REVIEW.md": "Reference/Research/MISTAKE_REVIEW",
     "DATA_SOURCE_RESEARCH_PLAN.md": "Reference/Research/DATA_SOURCE_RESEARCH_PLAN",
     "AUDIT_REPORT.md": "Reference/Operations/AUDIT_REPORT",
+    "docs/UNATTENDED_BACKEND.md": "Reference/Operations/UNATTENDED_BACKEND",
     "docs/OBSIDIAN_BRAIN.md": "Reference/Operations/OBSIDIAN_BRAIN",
     "docs/RELIANCE_COST_MATH.md": "Reference/Research/RELIANCE_COST_MATH",
     "workflow/current_task.md": "Reference/Workflow/Current Task",

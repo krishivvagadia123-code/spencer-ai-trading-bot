@@ -27,15 +27,48 @@ If broker SDK packages are present as dependencies, they must not be used to pla
 orders in Spencer. Any broker integration must remain disabled unless a future task
 explicitly changes the project scope and receives a separate safety review.
 
+## What Counts as Sensitive
+
+Beyond broker credentials, treat these as secrets in this project:
+
+- **LLM API keys** — Gemini/OpenAI/Google keys in `backend/.env` and the
+  research tools' `.env`.
+- **`SPENCER_API_TOKEN`** — the shared token gating the mutating backend
+  endpoints (`backend/.env`; mirrored to `webapp/.env` for local dev only).
+- **The Cloudflare tunnel URL** — exposes the local backend to the internet.
+  The backend behind it must stay read-only for the public; mutating endpoints
+  require the token. Do not paste the live tunnel URL into public places.
+- **Social login cookies** — captured by Agent-Reach under `~/.agent-reach/`;
+  local-only, never committed.
+- **The local SQLite DBs and journals** — `kite_bot.db`, `backtest_*.db`,
+  `trades.csv` — contain the real paper-trading record.
+
 ## Secret Handling
 
-Use local environment variables for private values. Keep `.env` files out of Git.
+Use local environment variables / `.env` files for private values, and keep
+them out of Git. Confirm coverage with `git check-ignore <file>` and run
+`python scripts/secret_scan.py` (read-only) before pushing.
 
-If a secret is accidentally committed:
+### Key-rotation policy
 
-1. Revoke or rotate it immediately.
-2. Remove it from the repository history before pushing.
-3. Re-run a safety review before using the repo again.
+Rotate a key immediately if it is exposed — including being **pasted into a chat
+or shared with a tool**, not only when committed to Git:
+
+1. Revoke/regenerate the key at its provider (e.g. Google AI Studio for Gemini).
+2. Update the local `.env` file(s) with the new value; never print it back.
+3. If it ever reached Git, remove it from history before the next push.
+4. Re-run `python scripts/secret_scan.py` and a quick safety review.
+
+## Incident Checklist
+
+When a secret may be exposed:
+
+1. **Contain** — revoke/rotate the affected key now.
+2. **Assess** — was it ever committed? `git log -S '<fragment>' --all`. Was the
+   repo public at the time?
+3. **Clean** — purge from working tree and history if present; re-run `secret_scan.py`.
+4. **Replace** — issue a new secret, update `.env`, restart the backend.
+5. **Record** — note what leaked, when, and the fix in this project's notes.
 
 ## Reporting Issues
 
