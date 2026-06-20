@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
+import { SPENCER_API_BASE } from "../utils/constants";
 
-const API_BASE = import.meta.env.VITE_SPENCER_API_BASE || "http://127.0.0.1:8787";
 const IST_OFFSET_SECONDS = 5.5 * 60 * 60;
 
 function marketLabel(marketState, marketStateLabel) {
@@ -60,7 +60,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
 
       try {
         const response = await fetch(
-          `${API_BASE}/api/chart?symbol=RELIANCE&interval=5m`,
+          `${SPENCER_API_BASE}/api/chart?symbol=RELIANCE&interval=5m`,
           { cache: "no-store", signal: activeRequest.signal },
         );
         if (!response.ok) throw new Error(`Chart request failed: ${response.status}`);

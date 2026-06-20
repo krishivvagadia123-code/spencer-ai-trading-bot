@@ -9,9 +9,9 @@ from urllib.request import Request, urlopen
 import spencer_quote_server
 
 
-def _request(port: int, path: str, *, payload=None):
+def _request(port: int, path: str, *, payload=None, headers=None):
     data = None
-    headers = {}
+    headers = dict(headers or {})
     if payload is not None:
         data = json.dumps(payload).encode("utf-8")
         headers["Content-Type"] = "application/json"
@@ -22,6 +22,11 @@ def _request(port: int, path: str, *, payload=None):
 
 def _server(brain_dir, monkeypatch):
     monkeypatch.setattr(spencer_quote_server, "BRAIN_DIR", brain_dir)
+    monkeypatch.setattr(
+        spencer_quote_server,
+        "_env_value",
+        lambda name: "test-write-token" if name == "SPENCER_WRITE_TOKEN" else "",
+    )
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), spencer_quote_server.Handler)
     thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     thread.start()
@@ -63,13 +68,19 @@ def test_brain_capture_requires_confirmation_and_persists(tmp_path, monkeypatch)
     try:
         port = httpd.server_address[1]
         try:
-            _request(port, "/api/brain/capture", payload={"title": "No", "content": "No"})
+            _request(
+                port,
+                "/api/brain/capture",
+                payload={"title": "No", "content": "No"},
+                headers={"X-Spencer-Confirm": "test-write-token"},
+            )
         except HTTPError as exc:
             rejected = json.loads(exc.read().decode("utf-8"))
             assert exc.code == 400
         _, created = _request(
             port,
             "/api/brain/capture",
+            headers={"X-Spencer-Confirm": "test-write-token"},
             payload={
                 "confirmed": True,
                 "title": "Operator decision",

@@ -65,7 +65,7 @@ export function useObsidianBrain() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Spencer-Confirm": "capture-memory",
+          "X-Spencer-Confirm": import.meta.env.VITE_SPENCER_WRITE_TOKEN || "",
         },
         body: JSON.stringify({
           confirmed: true,
@@ -91,7 +91,10 @@ export function useObsidianBrain() {
     try {
       const response = await fetch(`${SPENCER_API_BASE}/api/brain/reindex`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Spencer-Confirm": import.meta.env.VITE_SPENCER_WRITE_TOKEN || "",
+        },
         body: "{}",
       });
       const data = await response.json();

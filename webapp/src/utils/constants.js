@@ -18,4 +18,13 @@ export const RISK_MODES = [
 ];
 
 export const WIDGET_DEFAULTS = ["capital","strategy","brain","market","activity","trust"];
-export const SPENCER_API_BASE = import.meta.env.VITE_SPENCER_API_BASE || "http://127.0.0.1:8787";
+
+function runtimeApiBase() {
+  if (typeof window === "undefined") return "";
+  return String(window.__SPENCER_API_BASE__ || "").trim();
+}
+
+export const SPENCER_API_BASE =
+  runtimeApiBase() ||
+  import.meta.env.VITE_SPENCER_API_BASE ||
+  "http://127.0.0.1:8787";

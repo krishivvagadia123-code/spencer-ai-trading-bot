@@ -1,6 +1,5 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.jsx";
 import "./index.css";
 
 // ─── Canonical origin redirect ────────────────────────────────────────────────
@@ -21,8 +20,26 @@ import "./index.css";
   }
 })();
 
-createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>,
-);
+async function loadRuntimeConfig() {
+  window.__SPENCER_API_BASE__ = "";
+  try {
+    const response = await fetch("/spencer-config.json", { cache: "no-store" });
+    if (!response.ok) return;
+    const config = await response.json();
+    window.__SPENCER_API_BASE__ = String(config?.apiBase || "").trim();
+  } catch {
+    window.__SPENCER_API_BASE__ = "";
+  }
+}
+
+async function boot() {
+  await loadRuntimeConfig();
+  const { default: App } = await import("./App.jsx");
+  createRoot(document.getElementById("root")).render(
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>,
+  );
+}
+
+boot();
