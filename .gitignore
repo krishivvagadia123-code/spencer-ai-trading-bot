@@ -122,3 +122,7 @@ archive/
 brain/Daily/
 # Obsidian scratch artifacts in the vault
 brain/Untitled.*
+
+# cloudflared tunnel logs
+cloudflared.log.err
+cloudflared.out
