@@ -1142,6 +1142,113 @@ def _recent_orders(conn: sqlite3.Connection, ctx: dict | None = None, limit: int
     return out
 
 
+def _trades_resets_payload(db_path: Path | None = None) -> dict:
+    """Honest 'Trades & Resets' view.
+
+    Every paper trade taken (entry/exit/price/P&L), plus a count of how many times
+    the paper account was reset to the ₹5,000 basis. Two trade sources, kept
+    distinct and labelled so nothing is conflated:
+
+      * epoch trades  -> rows in the `trades` journal inside the current account
+        epoch (the live paper account; one entry + one exit per round trip).
+      * engine runs   -> rows in `live_paper_trades` from the forward paper engine
+        (dry-run replays and, once a candidate graduates, live sessions). Each row
+        is already a completed round trip with entry/exit/net P&L.
+
+    Resets are derived from journaled ONE_STOCK_RESET events (the epoch-establishing
+    close that set the account back to the ₹5,000 basis). Nothing is invented; if
+    the journal is absent the view says so honestly.
+    """
+    path = Path(db_path or DB_PATH)
+    if not path.exists():
+        return {"ok": True, "journalPresent": False,
+                "note": "No journal yet — run the paper engine to populate real data.",
+                "epoch": None, "basis": ACCOUNT_BASIS_INR,
+                "epochTrades": [], "engineTrades": [],
+                "resets": [], "resetCount": 0,
+                "totals": {"epochTrades": 0, "engineTrades": 0, "netPnl": 0.0}}
+
+    uri = f"{path.resolve().as_uri()}?mode=ro"
+    with sqlite3.connect(uri, uri=True) as conn:
+        conn.row_factory = sqlite3.Row
+        ctx = _epoch_context(conn)
+
+        # Epoch round trips: pair each SELL (with realised pnl) as a closed trade.
+        epoch_trades = []
+        for row in _epoch_trade_rows(conn, ctx):
+            if str(row["action"]).upper() != "SELL" or row["pnl"] is None:
+                continue
+            epoch_trades.append({
+                "ts": row["ts"], "symbol": row["symbol"], "side": "SELL",
+                "price": round(row["price"], 2) if row["price"] is not None else None,
+                "qty": row["qty"],
+                "pnl": round(row["pnl"], 2),
+                "reason": row["exit_reason"] or row["entry_reason"] or "",
+                "source": "epoch_journal",
+            })
+
+        # Forward paper-engine trades (dry-run replays + future live sessions).
+        engine_trades = []
+        try:
+            rows = conn.execute(
+                "SELECT t.entry_ts, t.exit_ts, t.symbol, t.qty, t.entry_price, "
+                "t.exit_price, t.gross_pnl, t.net_pnl, t.charges, t.slippage, "
+                "t.exit_reason, r.mode, r.candidate_id, r.session_date "
+                "FROM live_paper_trades t JOIN live_paper_runs r ON r.id = t.run_id "
+                "ORDER BY t.id"
+            ).fetchall()
+        except sqlite3.OperationalError:
+            rows = []
+        for row in rows:
+            engine_trades.append({
+                "mode": row["mode"], "candidateId": row["candidate_id"],
+                "sessionDate": row["session_date"], "symbol": row["symbol"],
+                "entryTs": row["entry_ts"], "exitTs": row["exit_ts"],
+                "qty": row["qty"],
+                "entryPrice": round(row["entry_price"], 2),
+                "exitPrice": round(row["exit_price"], 2),
+                "grossPnl": round(row["gross_pnl"], 2),
+                "charges": round(row["charges"], 2),
+                "slippage": round(row["slippage"], 2),
+                "netPnl": round(row["net_pnl"], 2),
+                "exitReason": row["exit_reason"],
+                "source": "paper_engine",
+            })
+
+        # Resets to the ₹5,000 basis: ONE_STOCK_RESET events grouped by timestamp.
+        reset_groups: dict[str, dict] = {}
+        for row in conn.execute(
+            "SELECT ts, symbol, pnl FROM trades WHERE exit_reason='ONE_STOCK_RESET' ORDER BY id"
+        ).fetchall():
+            g = reset_groups.setdefault(row["ts"], {"at": row["ts"], "positionsClosed": 0, "symbols": []})
+            g["positionsClosed"] += 1
+            g["symbols"].append(row["symbol"])
+        resets = list(reset_groups.values())
+
+    engine_net = round(sum(t["netPnl"] for t in engine_trades), 2)
+    epoch_net = round(sum(t["pnl"] for t in epoch_trades), 2)
+    return {
+        "ok": True,
+        "journalPresent": True,
+        "epoch": ctx["name"],
+        "epochStartedAt": ctx["startedAt"],
+        "basis": round(float(ctx["basis"]), 2),
+        "epochTrades": epoch_trades,
+        "engineTrades": engine_trades,
+        "resets": resets,
+        "resetCount": len(resets),
+        "totals": {
+            "epochTrades": len(epoch_trades),
+            "engineTrades": len(engine_trades),
+            "epochNetPnl": epoch_net,
+            "engineNetPnl": engine_net,
+        },
+        "note": "Engine trades are dry-run replays/forward paper sessions — research, "
+                "not the live epoch account. The epoch account holds the ₹5,000 basis. "
+                "No live epoch trade is taken until a candidate graduates the ladder.",
+    }
+
+
 def _real_bot_state() -> dict:
     """Build the dashboard state object from the real paper journal."""
     if not DB_PATH.exists():
@@ -1489,6 +1596,9 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if parsed.path == "/api/handoff":
                 _json(self, 200, _handoff_payload())
+                return
+            if parsed.path == "/api/trades-resets":
+                _json(self, 200, _trades_resets_payload())
                 return
             _json(self, 404, {"ok": False, "error": "unknown endpoint"})
         except Exception as exc:

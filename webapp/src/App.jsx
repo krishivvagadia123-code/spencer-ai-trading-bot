@@ -13,6 +13,7 @@ import { Brain } from "./pages/Brain";
 import { Research } from "./pages/Research";
 import { Governance } from "./pages/Governance";
 import { TradeTracker } from "./pages/TradeTracker";
+import { TradesResets } from "./pages/TradesResets";
 import { Profile } from "./pages/Profile";
 import { WhatIsSpencer } from "./pages/WhatIsSpencer";
 
@@ -20,6 +21,7 @@ import { useBotState } from "./hooks/useBotState";
 import { useQuotes } from "./hooks/useQuotes";
 import { useResearch } from "./hooks/useResearch";
 import { useResearchLedger } from "./hooks/useResearchLedger";
+import { useTradesResets } from "./hooks/useTradesResets";
 import { useHealth } from "./hooks/useHealth";
 import { useLocalProfile } from "./hooks/useLocalProfile";
 import { ONE_STOCK_SYMBOL } from "./utils/constants";
@@ -42,6 +44,7 @@ export default function App() {
   const { row: researchRow, status: researchStatus, loadResearch } = useResearch(ONE_STOCK_SYMBOL);
   const { ledger, status: ledgerStatus } = useResearchLedger();
   const { health, status: healthStatus, loadHealth } = useHealth();
+  const { data: tradesResets, status: tradesResetsStatus, reload: reloadTradesResets } = useTradesResets();
 
   const [activePage, setActivePage] = useState("Dashboard");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -95,6 +98,9 @@ export default function App() {
             <div className="space-y-12">
               <Section title="Funds"><Funds botState={botState} /></Section>
               <Section title="Trade Tracker"><TradeTracker botState={botState} /></Section>
+              <Section title="Trades & Resets">
+                <TradesResets data={tradesResets} status={tradesResetsStatus} reload={reloadTradesResets} />
+              </Section>
             </div>
           )}
 

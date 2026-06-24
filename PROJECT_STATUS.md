@@ -73,6 +73,13 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
   bar); archived in `candidates/SPNCR-002.md`. Lesson: lower frequency moved
   net per trade from −0.16% to −0.02%; captured breakout drift is still ~7×
   too small. Next hypothesis must select high-expected-range DAYS.
+- SPNCR-003 (gap-up fade, SHORT): **KILLED at IN_SAMPLE 2026-06-24** — 11 trades,
+  gross −₹85.62, costs ₹93.04, net −₹133.54 (edge −0.296% vs +0.618% bar), 2/11
+  wins; pre-registered splits `candidates/SPNCR-003.splits.json`, archived in
+  `candidates/SPNCR-003.md`, kill journaled in `backtest_kills`. Lesson: the
+  −0.40% session-average fade on gap-up days is not a tradeable short — the 1%
+  stop is hit on continuation days, and the fade days rarely clear the cost bar.
+  An unconditional aggregate that "clears cost" is not a per-trade edge.
 
 ## Live Paper-Trading Execution Engine (built 2026-06-14, dormant by design)
 

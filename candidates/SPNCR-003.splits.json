@@ -1,0 +1,10 @@
+{
+  "_comment": "Pre-registered 2026-06-24 BEFORE the SPNCR-003 ladder run, per RESEARCH_PROTOCOL.md. Data: intraday_prices 15m, real RELIANCE candles 2026-03-17..2026-06-23 (64 sessions). These ranges may not be changed after testing begins. NOTE: gap-up days are a subset of sessions, so per-window trade counts will be small; small n is an honesty flag, recorded not hidden.",
+  "in_sample": {"start": "2026-03-17", "end": "2026-05-15"},
+  "out_of_sample": {"start": "2026-05-18", "end": "2026-06-05"},
+  "walk_forward": [
+    {"start": "2026-03-17", "end": "2026-04-15"},
+    {"start": "2026-04-16", "end": "2026-05-15"},
+    {"start": "2026-05-18", "end": "2026-06-23"}
+  ]
+}
