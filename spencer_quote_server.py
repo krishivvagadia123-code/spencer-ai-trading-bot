@@ -22,10 +22,10 @@ from pathlib import Path
 from urllib.parse import parse_qs, quote, urlparse
 from urllib.request import Request, urlopen
 
-from bot.config import ONE_STOCK_UNIVERSE
+from bot.config import ONE_STOCK_UNIVERSE, default_config
 from bot.governance import build_action_capabilities, build_governance_snapshot
 from bot.holidays import is_nse_holiday
-from bot.market_data import IST
+from bot.market_data import IST, is_market_open
 from bot.obsidian_brain import ObsidianBrain
 
 PORT = 8787
@@ -345,10 +345,16 @@ def _timestamp_ist_label(value: str | None) -> str | None:
 
 
 def _attach_price_state(row: dict) -> dict:
-    status = str(row.get("status") or row.get("marketState") or "").upper()
     has_price = row.get("price") is not None
     asof = _timestamp_ist_label(row.get("timestamp") or row.get("fetchedAt"))
-    is_open = status in {"REGULAR", "OPEN"}
+    # Authoritative: NSE session by IST clock + weekday + holidays. The quote's
+    # own status string is unreliable in this path (often last_close), which made
+    # the badge show CLOSED even during market hours.
+    try:
+        is_open = bool(is_market_open(default_config().market)[0])
+    except Exception:
+        status = str(row.get("status") or row.get("marketState") or "").upper()
+        is_open = status in {"REGULAR", "OPEN"}
     state = "OPEN" if is_open else "CLOSED"
     if not has_price:
         label = "awaiting first real quote"

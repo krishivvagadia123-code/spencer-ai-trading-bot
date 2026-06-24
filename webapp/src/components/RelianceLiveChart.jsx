@@ -5,7 +5,7 @@ const IST_OFFSET_SECONDS = 5.5 * 60 * 60;
 
 function marketLabel(marketState, marketStateLabel) {
   const state = String(marketState || "").toUpperCase();
-  if (state === "OPEN") return "Live · NSE";
+  if (state === "OPEN") return "OPEN · NSE";
   if (marketStateLabel) return marketStateLabel;
   if (state) return "Market closed";
   return "Status unavailable";
@@ -195,7 +195,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
       }`}
       data-latest-price={latestPrice ?? ""}
     >
-      <div ref={containerRef} className="h-full w-full" />
+      <div ref={containerRef} className="h-full w-full pt-4" />
 
       <div
         ref={dotRef}
