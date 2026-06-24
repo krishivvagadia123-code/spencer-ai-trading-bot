@@ -126,3 +126,7 @@ brain/Untitled.*
 # cloudflared tunnel logs
 cloudflared.log.err
 cloudflared.out
+
+# Generated research scan outputs (regenerated daily; brain serves them live)
+workflow/research_findings.json
+brain/Latest Research Scan.md

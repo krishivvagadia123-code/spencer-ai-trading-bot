@@ -8,6 +8,7 @@ $AuditScript = Join-Path $ProjectRoot "scripts\audit_data_integrity.py"
 $AuditLogScript = Join-Path $ProjectRoot "scripts\append_daily_audit.py"
 $AuditLog = Join-Path $ProjectRoot "workflow\logs\daily_audit.log"
 $BrainScript = Join-Path $ProjectRoot "scripts\export_brain.py"
+$ResearchScript = Join-Path $ProjectRoot "scripts\research_scan.py"
 
 Set-Location $ProjectRoot
 
@@ -30,8 +31,15 @@ if ($LASTEXITCODE -ne 0) {
     Write-Warning "Data-integrity audit result could not be appended to $AuditLog"
 }
 
+# Research scan: mine the DB for candidate edges and feed the brain (read-only,
+# best-effort; a scan hiccup never fails the data job).
+& $PythonExe $ResearchScript
+if ($LASTEXITCODE -ne 0) {
+    Write-Warning "Research scan did not complete cleanly."
+}
+
 # Refresh the Obsidian primary brain from the latest state (read-only over the DB;
-# best-effort — a brain-export hiccup never fails the data job).
+# best-effort - a brain-export hiccup never fails the data job).
 & $PythonExe $BrainScript
 if ($LASTEXITCODE -ne 0) {
     Write-Warning "Brain export did not complete cleanly."

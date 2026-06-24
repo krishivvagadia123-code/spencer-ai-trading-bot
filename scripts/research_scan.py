@@ -21,6 +21,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 DB = ROOT / "kite_bot.db"
 OUT = ROOT / "workflow" / "research_findings.json"
+# A note in the Obsidian vault: the backend indexes every brain/*.md for the
+# brain chat/search/graph, so writing here feeds findings straight into the brain.
+BRAIN_NOTE = ROOT / "brain" / "Latest Research Scan.md"
 
 # Cost bar (docs/RELIANCE_COST_MATH.md): intraday round-trip breakeven ~0.106%.
 # A real edge must clear ~3x that to survive slippage/variance.
@@ -114,6 +117,39 @@ def main() -> int:
     }
     OUT.parent.mkdir(parents=True, exist_ok=True)
     OUT.write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    # Feed the brain: write a vault note the backend will index for chat/search.
+    candidates = [f for f in report["findings"] if f["clears_cost_bar"]]
+    lines = [
+        "---", "tags: [spencer, research, generated]",
+        f"updated: {report['generated_at']}", "managed: false",
+        'source_path: "scripts/research_scan.py"', "---",
+        "# Latest Research Scan", "",
+        f"> Read-only EDA over {report['sessions_analyzed']} real RELIANCE sessions "
+        f"({report['date_range'][0]}..{report['date_range'][1]}). Hypotheses only — "
+        "none is validated until it passes the [[Confirm-or-Kill]] ladder and clears the [[Cost Bar]].",
+        "", "| pattern | n | mean | t | clears cost? | significant? |",
+        "|---|---|---|---|---|---|",
+    ]
+    for f in report["findings"]:
+        lines.append(f"| {f['name']} | {f['n']} | {pct(f['mean'])} | {f['t_stat']} | "
+                     f"{'yes' if f['clears_cost_bar'] else 'no'} | {'yes' if f['significant'] else 'no'} |")
+    lines.append("")
+    strong = [f for f in candidates if f["significant"]]
+    if strong:
+        lines.append("## Candidate edges (clear cost + statistically notable)")
+        for f in strong:
+            lines.append(f"- **{f['name']}** — {f['hypothesis']} (mean {pct(f['mean'])}, t={f['t_stat']}, n={f['n']})")
+    elif candidates:
+        top = candidates[0]
+        lines.append("## Lead worth formalizing (clears cost, not yet significant)")
+        lines.append(f"- **{top['name']}** — {top['hypothesis']} (mean {pct(top['mean'])}, "
+                     f"t={top['t_stat']}, n={top['n']}). Candidate for the next experiment via the [[Backtest Harness]].")
+    else:
+        lines.append("No pattern clears the cost bar in this sample. Honest result: no edge yet.")
+    lines += ["", "Back to [[Research Findings]] · [[Research Ledger]] · [[Spencer]]."]
+    BRAIN_NOTE.parent.mkdir(parents=True, exist_ok=True)
+    BRAIN_NOTE.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     print(f"=== Spencer research scan: {len(days)} sessions ({days[0]}..{days[-1]}) ===")
     print(f"Cost bar (round-trip): {pct(ROUND_TRIP_COST)} | edge target ~3x: {pct(EDGE_TARGET)}\n")
