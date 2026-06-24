@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 ALLOWED_SYMBOL = "RELIANCE"
-ALLOWED_INTERVALS = {"1m", "15m"}
+ALLOWED_INTERVALS = {"1m", "15m", "1d"}
 CAPITAL_BASIS_INR = 5_000.0
 ALLOWED_SIDES = {"LONG", "SHORT"}
 EXECUTION_ASSUMPTION = {

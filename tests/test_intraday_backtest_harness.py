@@ -135,6 +135,7 @@ def test_candidate_validation_rejects_future_references_and_bad_shape():
     assert _candidate(side="SHORT").side == "SHORT"
     with pytest.raises(ValueError, match="side"):
         _candidate(side="FLAT")
+    assert _candidate(interval="1d").interval == "1d"
 
 
 def test_context_prev_session_range_gap_and_first_session_nan():
@@ -397,3 +398,170 @@ def test_rolling_operand_is_not_shadowed_by_its_field_key():
     # mean = 103.2, latest close = 110 -> must be True; the shadowed-field bug
     # evaluated right as the latest close (110 > 110 = False).
     assert evaluate_rule(rule, history, {}) is True
+
+
+def _make_daily_db(tmp_path, rows):
+    db_path = tmp_path / "synthetic_daily.db"
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.execute(
+            """
+            CREATE TABLE daily_prices (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                trade_date TEXT NOT NULL,
+                open REAL NOT NULL,
+                high REAL NOT NULL,
+                low REAL NOT NULL,
+                close REAL NOT NULL,
+                volume REAL NOT NULL,
+                prev_close REAL,
+                quote_timestamp TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                source TEXT NOT NULL,
+                market_state TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(symbol, trade_date)
+            )
+            """
+        )
+        prev_close = None
+        for row in rows:
+            ts = f"{row['trade_date']}T15:30:00+05:30"
+            conn.execute(
+                """
+                INSERT INTO daily_prices
+                    (symbol, trade_date, open, high, low, close, volume,
+                     prev_close, quote_timestamp, fetched_at, source,
+                     market_state, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    "RELIANCE",
+                    row["trade_date"],
+                    row["open"],
+                    row["high"],
+                    row["low"],
+                    row["close"],
+                    row.get("volume", 1000),
+                    prev_close,
+                    ts,
+                    ts,
+                    "synthetic daily unit test candles",
+                    "CLOSED",
+                    ts,
+                ),
+            )
+            prev_close = row["close"]
+        conn.commit()
+    return db_path
+
+
+def _daily_rows(*, edge: bool):
+    rows = []
+    day = date(2026, 1, 1)
+    while len(rows) < 20:
+        if day.weekday() < 5:
+            rows.append({
+                "trade_date": day.isoformat(),
+                "open": 100.0,
+                "high": 101.0,
+                "low": 99.0,
+                "close": 100.0,
+                "volume": 1000.0,
+            })
+        day = date.fromordinal(day.toordinal() + 1)
+    for payload in (
+        {"open": 100.0, "high": 110.0, "low": 90.0, "close": 92.0, "volume": 2200.0},
+        {"open": 100.0, "high": 112.0, "low": 99.0, "close": 110.0 if edge else 94.0, "volume": 1200.0},
+        {"open": 118.0 if edge else 92.0, "high": 132.0 if edge else 95.0, "low": 117.0 if edge else 88.0, "close": 130.0 if edge else 90.0, "volume": 1200.0},
+        {"open": 131.0 if edge else 89.0, "high": 133.0 if edge else 91.0, "low": 129.0 if edge else 87.0, "close": 132.0 if edge else 88.0, "volume": 1200.0},
+    ):
+        while day.weekday() >= 5:
+            day = date.fromordinal(day.toordinal() + 1)
+        rows.append({"trade_date": day.isoformat(), **payload})
+        day = date.fromordinal(day.toordinal() + 1)
+    return rows
+
+
+def _daily_candidate(**updates):
+    data = {
+        "id": "daily_candidate_test",
+        "version": "v1",
+        "hypothesis": "Synthetic daily mean-reversion candidate, not a real technique.",
+        "symbol": "RELIANCE",
+        "interval": "1d",
+        "entry_rule": {
+            "all": [
+                {"left": {"field": "close_location"}, "op": "<=", "right": {"value": 0.35}},
+                {
+                    "left": {"field": "volume"},
+                    "op": ">",
+                    "right": {"rolling": "mean", "field": "volume", "window": 20, "scale": 1.5},
+                },
+            ]
+        },
+        "exit_rule": {"left": {"field": "close"}, "op": ">=", "right": {"value": 125}},
+        "stop_rule": {"type": "fixed_pct", "pct": 0.2},
+        "sizing_rule": {"type": "fixed_qty", "qty": 3},
+        "no_trade_conditions": [],
+        "execution_assumption": {
+            "entry_fill": "next_candle_open",
+            "exit_fill": "next_candle_open",
+        },
+        "parameters": {"max_hold_days": 3},
+        "capital": 5000.0,
+        "max_open_positions": 1,
+        "side": "LONG",
+    }
+    data.update(updates)
+    return candidate_from_dict(data)
+
+
+def test_daily_multiday_mean_revert_candidate_passes_with_delivery_costs(tmp_path):
+    db_path = _make_daily_db(tmp_path, _daily_rows(edge=True))
+
+    result = run_backtest(_daily_candidate(), db_path=db_path, persist=False)
+
+    assert result.status == "PASS"
+    trade = result.trades[0]
+    assert trade["entry_ts"] < trade["exit_ts"]
+    assert trade["exit_reason"] == "RULE_EXIT"
+    assert trade["qty"] == 3
+    assert trade["charges"] > 15
+    assert trade["slippage"] > 0
+    assert result.summary["cost_bar_pass"] is True
+
+
+def test_daily_multiday_no_edge_candidate_fails_after_costs(tmp_path):
+    db_path = _make_daily_db(tmp_path, _daily_rows(edge=False))
+
+    result = run_backtest(_daily_candidate(), db_path=db_path, persist=False)
+
+    assert result.status == "FAIL"
+    trade = result.trades[0]
+    assert trade["exit_reason"] in {"MAX_HOLD", "DATASET_END"}
+    assert trade["charges"] > 15
+    assert result.summary["net_pnl"] < 0
+
+
+def test_daily_max_hold_exits_without_session_square_off(tmp_path):
+    rows = _daily_rows(edge=True)
+    rows.append({
+        "trade_date": "2026-02-04",
+        "open": 133.0,
+        "high": 134.0,
+        "low": 132.0,
+        "close": 133.0,
+        "volume": 1200.0,
+    })
+    db_path = _make_daily_db(tmp_path, rows)
+    candidate = _daily_candidate(
+        exit_rule={"left": {"field": "close"}, "op": ">", "right": {"value": 1000}},
+        parameters={"max_hold_days": 2},
+    )
+
+    result = run_backtest(candidate, db_path=db_path, persist=False)
+
+    trade = result.trades[0]
+    assert trade["exit_reason"] == "MAX_HOLD"
+    assert trade["entry_ts"][:10] != trade["exit_ts"][:10]

@@ -31,6 +31,7 @@ from bot.research_candidates import (
 BASE_DIR = Path(__file__).resolve().parent.parent
 DB_PATH = BASE_DIR / "kite_bot.db"
 PRODUCT = "INTRADAY"
+DAILY_PRODUCT = "DELIVERY"
 STAGES = {"IN_SAMPLE", "OUT_OF_SAMPLE", "WALK_FORWARD"}
 
 
@@ -135,6 +136,8 @@ def load_candles(
     start: date | str | None = None,
     end: date | str | None = None,
 ) -> list[Candle]:
+    if candidate.interval == "1d":
+        return load_daily_candles(db_path, candidate, start=start, end=end)
     start_date = date.fromisoformat(str(start)) if start is not None else None
     end_date = date.fromisoformat(str(end)) if end is not None else None
     with sqlite3.connect(str(db_path)) as conn:
@@ -168,6 +171,52 @@ def load_candles(
                 close=round(float(row["close"]), 2),
                 volume=round(float(row["volume"] or 0), 2),
                 source=row["source"] or "",
+            )
+        )
+    return candles
+
+
+def load_daily_candles(
+    db_path: str | Path,
+    candidate: ResearchCandidate,
+    *,
+    start: date | str | None = None,
+    end: date | str | None = None,
+) -> list[Candle]:
+    start_date = date.fromisoformat(str(start)) if start is not None else None
+    end_date = date.fromisoformat(str(end)) if end is not None else None
+    with sqlite3.connect(str(db_path)) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """
+            SELECT symbol, trade_date, open, high, low, close, volume, prev_close, source
+            FROM daily_prices
+            WHERE symbol=? AND open IS NOT NULL AND high IS NOT NULL
+              AND low IS NOT NULL AND close IS NOT NULL
+            ORDER BY trade_date
+            """,
+            (candidate.symbol,),
+        ).fetchall()
+
+    candles = []
+    for row in rows:
+        session = date.fromisoformat(str(row["trade_date"]))
+        if start_date is not None and session < start_date:
+            continue
+        if end_date is not None and session > end_date:
+            continue
+        ts = datetime.combine(session, datetime.min.time(), tzinfo=IST).replace(hour=15, minute=30)
+        candles.append(
+            Candle(
+                symbol=row["symbol"],
+                interval="1d",
+                ts=ts,
+                open=round(float(row["open"]), 2),
+                high=round(float(row["high"]), 2),
+                low=round(float(row["low"]), 2),
+                close=round(float(row["close"]), 2),
+                volume=round(float(row["volume"] or 0), 2),
+                source=row["source"] or "daily_prices",
             )
         )
     return candles
@@ -285,7 +334,7 @@ def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float 
         # also carry a field key.
         return _context_value(spec, history)
     if "field" in spec:
-        return getattr(history[-1], str(spec["field"]))
+        return _field_value(history[-1], str(spec["field"]))
     if "lag" in spec:
         periods = int(spec.get("periods", 1))
         if periods < 0:
@@ -293,8 +342,17 @@ def _operand_value(spec: Any, history: Sequence[Candle], params: dict) -> float 
         idx = len(history) - 1 - periods
         if idx < 0:
             return float("nan")
-        return getattr(history[idx], str(spec["lag"]))
+        return _field_value(history[idx], str(spec["lag"]))
     raise ValueError(f"unknown operand: {spec!r}")
+
+
+def _field_value(candle: Candle, field: str) -> float:
+    if field == "close_location":
+        width = float(candle.high) - float(candle.low)
+        if width <= 0:
+            return float("nan")
+        return (float(candle.close) - float(candle.low)) / width
+    return getattr(candle, field)
 
 
 def _context_value(spec: dict, history: Sequence[Candle]) -> float:
@@ -313,16 +371,19 @@ def _rolling_value(spec: dict, history: Sequence[Candle]) -> float:
         raise ValueError("rolling window must be positive")
     if len(history) < window:
         return float("nan")
-    vals = [float(getattr(c, field)) for c in history[-window:]]
+    vals = [float(_field_value(c, field)) for c in history[-window:]]
     if fn == "mean":
-        return sum(vals) / len(vals)
-    if fn == "min":
-        return min(vals)
-    if fn == "max":
-        return max(vals)
-    if fn == "sum":
-        return sum(vals)
-    raise ValueError(f"unsupported rolling function: {fn}")
+        value = sum(vals) / len(vals)
+    elif fn == "min":
+        value = min(vals)
+    elif fn == "max":
+        value = max(vals)
+    elif fn == "sum":
+        value = sum(vals)
+    else:
+        raise ValueError(f"unsupported rolling function: {fn}")
+    scale = float(spec.get("scale", 1.0))
+    return value * scale
 
 
 def evaluate_rule(rule: Any, history: Sequence[Candle], params: dict) -> bool:
@@ -371,8 +432,12 @@ def _quote(symbol: str, price: float, ts: datetime) -> Quote:
     return Quote(symbol=symbol, price=price, timestamp=ts, is_stale=False, reject_reason=None)
 
 
-def _fill(symbol: str, side: str, qty: float, price: float, ts: datetime):
-    fill = simulate_fill(_quote(symbol, price, ts), side, qty, default_config().fees, product=PRODUCT)
+def _product_for_interval(interval: str) -> str:
+    return DAILY_PRODUCT if interval == "1d" else PRODUCT
+
+
+def _fill(symbol: str, side: str, qty: float, price: float, ts: datetime, *, product: str = PRODUCT):
+    fill = simulate_fill(_quote(symbol, price, ts), side, qty, default_config().fees, product=product)
     if not fill.is_executed:
         raise ValueError(fill.reject_reason or "fill rejected")
     return fill
@@ -541,6 +606,11 @@ def replay_candidate(
     sizing_rule = rule_to_dict(candidate.sizing_rule)
     no_trade_rules = [rule_to_dict(rule) for rule in candidate.no_trade_conditions]
     position_side = candidate.side
+    is_daily = candidate.interval == "1d"
+    product = _product_for_interval(candidate.interval)
+    max_hold_days = int(params.get("max_hold_days", 0) or 0) if is_daily else 0
+    if max_hold_days < 0:
+        raise ValueError("max_hold_days cannot be negative")
     candles = _contextualize_candles(list(candles))
     if len(candles) < 2:
         dataset = _dataset(candles)
@@ -579,24 +649,31 @@ def replay_candidate(
         next_candle = candles[i + 1] if i + 1 < len(candles) else None
 
         if open_position is not None:
-            must_square_off = next_candle is None or not _same_session(candle, next_candle)
+            dataset_end = next_candle is None
+            must_square_off = dataset_end or (not is_daily and not _same_session(candle, next_candle))
+            max_hold_hit = bool(
+                is_daily
+                and max_hold_days
+                and i - int(open_position["entry_index"]) >= max_hold_days
+            )
             stop_hit = _stop_hit(position_side, candle, open_position["stop_price"])
             exit_signal = evaluate_rule(exit_rule, history, params)
-            if stop_hit or exit_signal or must_square_off:
+            if stop_hit or exit_signal or must_square_off or max_hold_hit:
                 if must_square_off:
                     quote_price = candle.close
                     exit_ts = candle.ts
-                    exit_reason = "SESSION_END"
+                    exit_reason = "DATASET_END" if is_daily and dataset_end else "SESSION_END"
                 else:
                     quote_price = next_candle.open
                     exit_ts = next_candle.ts
-                    exit_reason = "STOP" if stop_hit else "RULE_EXIT"
+                    exit_reason = "STOP" if stop_hit else ("MAX_HOLD" if max_hold_hit else "RULE_EXIT")
                 exit_fill = _fill(
                     candidate.symbol,
                     _exit_fill_side(position_side),
                     open_position["qty"],
                     quote_price,
                     exit_ts,
+                    product=product,
                 )
                 gross = _gross_pnl(
                     position_side,
@@ -630,7 +707,8 @@ def replay_candidate(
                 if not must_square_off and next_candle is not None:
                     continue
 
-        if open_position is None and next_candle is not None and _same_session(candle, next_candle):
+        can_enter_next = next_candle is not None and (is_daily or _same_session(candle, next_candle))
+        if open_position is None and can_enter_next:
             if any(evaluate_rule(rule, history, params) for rule in no_trade_rules):
                 continue
             if not evaluate_rule(entry_rule, history, params):
@@ -641,11 +719,13 @@ def replay_candidate(
                 _qty_from_sizing(sizing_rule, next_candle.open, capital),
                 next_candle.open,
                 next_candle.ts,
+                product=product,
             )
             stop = _stop_price(stop_rule, entry_fill.fill_price, history, params, position_side)
             open_position = {
                 "qty": entry_fill.qty,
                 "entry_ts": next_candle.ts,
+                "entry_index": i + 1,
                 "entry_price": entry_fill.fill_price,
                 "entry_quote_price": next_candle.open,
                 "entry_charges": entry_fill.charges.total,
