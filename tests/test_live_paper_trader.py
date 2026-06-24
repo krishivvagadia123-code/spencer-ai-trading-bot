@@ -39,7 +39,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 # ── builders ──────────────────────────────────────────────────────────────────
 
 def _candidate(*, entry, exit_, stop, cid="TEST-001", version="1",
-               no_trade=None, parameters=None, interval="15m"):
+               no_trade=None, parameters=None, interval="15m", side="LONG"):
     return candidate_from_dict({
         "id": cid,
         "version": version,
@@ -56,7 +56,7 @@ def _candidate(*, entry, exit_, stop, cid="TEST-001", version="1",
         "tunable_parameters": [],
         "capital": 5000.0,
         "max_open_positions": 1,
-        "side": "LONG",
+        "side": side,
     })
 
 
@@ -299,6 +299,27 @@ def test_live_engine_matches_backtest_exactly(tmp_path):
     assert live["trades"] == bt.summary["trades"]
     assert live["net_pnl"] == bt.summary["net_pnl"]
     assert live["trades"] == 3  # one squared-off trade per session
+
+
+def test_live_engine_matches_backtest_exactly_for_short(tmp_path):
+    """SHORT candidates must preserve the same backtest/live parity guarantee:
+    entry SELL, cover BUY, upside stop, and identical P&L over the same bars."""
+    db = tmp_path / "short_parity.db"
+    _make_multi_session_db(db, sessions=3, bars=5)
+    cand = _candidate(
+        entry=ALWAYS,
+        exit_=NEVER,
+        stop={"type": "fixed_pct", "pct": 0.5},
+        side="SHORT",
+    )
+
+    bt = run_backtest(cand, db_path=db, stage="IN_SAMPLE", persist=False)
+    live = run_dry_run_range(cand, db_path=db, gate_path=_gate(tmp_path / "gate.json"),
+                             persist=False)
+
+    assert live["trades"] == bt.summary["trades"]
+    assert live["net_pnl"] == bt.summary["net_pnl"]
+    assert live["trades"] == 3
 
 
 # ── no-broker invariant ───────────────────────────────────────────────────────

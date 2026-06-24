@@ -378,6 +378,26 @@ def _fill(symbol: str, side: str, qty: float, price: float, ts: datetime):
     return fill
 
 
+def _entry_fill_side(position_side: str) -> str:
+    return "SELL" if position_side == "SHORT" else "BUY"
+
+
+def _exit_fill_side(position_side: str) -> str:
+    return "BUY" if position_side == "SHORT" else "SELL"
+
+
+def _gross_pnl(position_side: str, entry_price: float, exit_price: float, qty: float) -> float:
+    if position_side == "SHORT":
+        return round((entry_price - exit_price) * qty, 2)
+    return round((exit_price - entry_price) * qty, 2)
+
+
+def _stop_hit(position_side: str, candle: Candle, stop_price: float) -> bool:
+    if position_side == "SHORT":
+        return candle.high >= stop_price
+    return candle.low <= stop_price
+
+
 def _qty_from_sizing(sizing_rule: dict, entry_quote: float, capital: float) -> int:
     kind = str(sizing_rule.get("type") or sizing_rule.get("kind"))
     if kind == "fixed_qty":
@@ -392,17 +412,30 @@ def _qty_from_sizing(sizing_rule: dict, entry_quote: float, capital: float) -> i
     return qty
 
 
-def _stop_price(stop_rule: dict, entry_price: float, history: Sequence[Candle], params: dict) -> float:
+def _stop_price(
+    stop_rule: dict,
+    entry_price: float,
+    history: Sequence[Candle],
+    params: dict,
+    side: str = "LONG",
+) -> float:
     kind = str(stop_rule.get("type") or stop_rule.get("kind"))
     if kind == "fixed_pct":
-        stop = entry_price * (1 - float(stop_rule["pct"]))
+        pct = float(stop_rule["pct"])
+        stop = entry_price * (1 + pct) if side == "SHORT" else entry_price * (1 - pct)
     elif kind == "fixed_points":
-        stop = entry_price - float(stop_rule["points"])
+        points = float(stop_rule["points"])
+        stop = entry_price + points if side == "SHORT" else entry_price - points
     elif kind == "price":
         stop = float(_operand_value(stop_rule["value"], history, params))
     else:
         raise ValueError(f"unsupported stop rule: {kind}")
-    if stop <= 0 or stop >= entry_price:
+    if stop <= 0:
+        raise ValueError(f"invalid {side.lower()} stop {stop} for entry {entry_price}")
+    if side == "SHORT":
+        if stop <= entry_price:
+            raise ValueError(f"invalid short stop {stop} for entry {entry_price}")
+    elif stop >= entry_price:
         raise ValueError(f"invalid long stop {stop} for entry {entry_price}")
     return round(stop, 2)
 
@@ -507,6 +540,7 @@ def replay_candidate(
     stop_rule = rule_to_dict(candidate.stop_rule)
     sizing_rule = rule_to_dict(candidate.sizing_rule)
     no_trade_rules = [rule_to_dict(rule) for rule in candidate.no_trade_conditions]
+    position_side = candidate.side
     candles = _contextualize_candles(list(candles))
     if len(candles) < 2:
         dataset = _dataset(candles)
@@ -546,7 +580,7 @@ def replay_candidate(
 
         if open_position is not None:
             must_square_off = next_candle is None or not _same_session(candle, next_candle)
-            stop_hit = candle.low <= open_position["stop_price"]
+            stop_hit = _stop_hit(position_side, candle, open_position["stop_price"])
             exit_signal = evaluate_rule(exit_rule, history, params)
             if stop_hit or exit_signal or must_square_off:
                 if must_square_off:
@@ -557,10 +591,21 @@ def replay_candidate(
                     quote_price = next_candle.open
                     exit_ts = next_candle.ts
                     exit_reason = "STOP" if stop_hit else "RULE_EXIT"
-                sell = _fill(candidate.symbol, "SELL", open_position["qty"], quote_price, exit_ts)
-                gross = round((sell.fill_price - open_position["entry_price"]) * open_position["qty"], 2)
-                charges = round(open_position["entry_charges"] + sell.charges.total, 2)
-                slippage = round(open_position["entry_slippage"] + sell.total_slippage, 2)
+                exit_fill = _fill(
+                    candidate.symbol,
+                    _exit_fill_side(position_side),
+                    open_position["qty"],
+                    quote_price,
+                    exit_ts,
+                )
+                gross = _gross_pnl(
+                    position_side,
+                    open_position["entry_price"],
+                    exit_fill.fill_price,
+                    open_position["qty"],
+                )
+                charges = round(open_position["entry_charges"] + exit_fill.charges.total, 2)
+                slippage = round(open_position["entry_slippage"] + exit_fill.total_slippage, 2)
                 net = round(gross - charges, 2)
                 equity = round(equity + net, 2)
                 trade = {
@@ -568,7 +613,7 @@ def replay_candidate(
                     "entry_ts": open_position["entry_ts"].isoformat(),
                     "exit_ts": exit_ts.isoformat(),
                     "entry_price": open_position["entry_price"],
-                    "exit_price": sell.fill_price,
+                    "exit_price": exit_fill.fill_price,
                     "entry_quote_price": open_position["entry_quote_price"],
                     "exit_quote_price": quote_price,
                     "qty": open_position["qty"],
@@ -590,15 +635,21 @@ def replay_candidate(
                 continue
             if not evaluate_rule(entry_rule, history, params):
                 continue
-            buy = _fill(candidate.symbol, "BUY", _qty_from_sizing(sizing_rule, next_candle.open, capital), next_candle.open, next_candle.ts)
-            stop = _stop_price(stop_rule, buy.fill_price, history, params)
+            entry_fill = _fill(
+                candidate.symbol,
+                _entry_fill_side(position_side),
+                _qty_from_sizing(sizing_rule, next_candle.open, capital),
+                next_candle.open,
+                next_candle.ts,
+            )
+            stop = _stop_price(stop_rule, entry_fill.fill_price, history, params, position_side)
             open_position = {
-                "qty": buy.qty,
+                "qty": entry_fill.qty,
                 "entry_ts": next_candle.ts,
-                "entry_price": buy.fill_price,
+                "entry_price": entry_fill.fill_price,
                 "entry_quote_price": next_candle.open,
-                "entry_charges": buy.charges.total,
-                "entry_slippage": buy.total_slippage,
+                "entry_charges": entry_fill.charges.total,
+                "entry_slippage": entry_fill.total_slippage,
                 "stop_price": stop,
             }
 

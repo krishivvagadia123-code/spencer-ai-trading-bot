@@ -16,6 +16,7 @@ from typing import Any, Iterable
 ALLOWED_SYMBOL = "RELIANCE"
 ALLOWED_INTERVALS = {"1m", "15m"}
 CAPITAL_BASIS_INR = 5_000.0
+ALLOWED_SIDES = {"LONG", "SHORT"}
 EXECUTION_ASSUMPTION = {
     "entry_fill": "next_candle_open",
     "exit_fill": "next_candle_open",
@@ -203,8 +204,8 @@ def candidate_from_dict(data: dict) -> ResearchCandidate:
         raise ValueError("candidate max_open_positions must be exactly 1")
 
     side = str(data.get("side", "LONG")).upper()
-    if side != "LONG":
-        raise ValueError("only LONG intraday candidates are supported")
+    if side not in ALLOWED_SIDES:
+        raise ValueError(f"candidate side must be one of {sorted(ALLOWED_SIDES)}, got {side}")
 
     assumption = dict(data["execution_assumption"])
     if assumption != EXECUTION_ASSUMPTION:

@@ -42,8 +42,12 @@ from bot.intraday_backtest import (
     Candle,
     PRODUCT,
     _contextualize_candles,
+    _entry_fill_side,
+    _exit_fill_side,
+    _gross_pnl,
     _qty_from_sizing,
     _same_session,
+    _stop_hit,
     _stop_price,
     evaluate_rule,
     load_candles,
@@ -278,10 +282,10 @@ class LivePaperTrader:
                 self._record(candle.ts, "SESSION_END", "forced square-off at session close")
                 self._close_position(candle.close, candle.ts, "SESSION_END")
                 return
-            if candle.low <= self._position.stop_price:
+            if _stop_hit(self.candidate.side, candle, self._position.stop_price):
                 self._record(
                     candle.ts, "STOP",
-                    f"low {candle.low} <= stop {self._position.stop_price}",
+                    f"{self.candidate.side.lower()} stop hit at {self._position.stop_price}",
                 )
                 self._pending = ("EXIT", "STOP")
             elif evaluate_rule(self._exit_rule, self._history, self.params):
@@ -324,10 +328,16 @@ class LivePaperTrader:
 
     def _open_position(self, candle: Candle, history_prev: Sequence[Candle]) -> None:
         qty = _qty_from_sizing(self._sizing_rule, candle.open, self.capital)
-        fill = self._fill("BUY", qty, candle.open, candle.ts)
+        fill = self._fill(_entry_fill_side(self.candidate.side), qty, candle.open, candle.ts)
         # Stop is decided from the signal-time history (history before this fill
         # bar) and the realised fill price — identical to the backtest.
-        stop = _stop_price(self._stop_rule, fill.fill_price, history_prev, self.params)
+        stop = _stop_price(
+            self._stop_rule,
+            fill.fill_price,
+            history_prev,
+            self.params,
+            self.candidate.side,
+        )
         self._position = _Position(
             qty=fill.qty,
             entry_ts=candle.ts,
@@ -337,15 +347,15 @@ class LivePaperTrader:
             stop_price=stop,
         )
         self._record(
-            candle.ts, "FILL_BUY",
+            candle.ts, f"FILL_{fill.side}",
             f"qty={fill.qty} price={fill.fill_price} stop={stop}",
         )
 
     def _close_position(self, price: float, ts: datetime, reason: str) -> None:
         pos = self._position
         assert pos is not None
-        fill = self._fill("SELL", pos.qty, price, ts)
-        gross = round((fill.fill_price - pos.entry_price) * pos.qty, 2)
+        fill = self._fill(_exit_fill_side(self.candidate.side), pos.qty, price, ts)
+        gross = _gross_pnl(self.candidate.side, pos.entry_price, fill.fill_price, pos.qty)
         charges = round(pos.entry_charges + fill.charges.total, 2)
         slippage = round(pos.entry_slippage + fill.total_slippage, 2)
         net = round(gross - charges, 2)
@@ -363,7 +373,7 @@ class LivePaperTrader:
             "exit_reason": reason,
             "stop_price": pos.stop_price,
         })
-        self._record(ts, "FILL_SELL", f"price={fill.fill_price} net={net} reason={reason}")
+        self._record(ts, f"FILL_{fill.side}", f"price={fill.fill_price} net={net} reason={reason}")
         self._position = None
 
     def _fill(self, side: str, qty: float, price: float, ts: datetime):

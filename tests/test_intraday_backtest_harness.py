@@ -132,6 +132,9 @@ def test_candidate_validation_rejects_future_references_and_bad_shape():
         _candidate(capital=10_000.0)
     with pytest.raises(ValueError, match="max_open_positions"):
         _candidate(max_open_positions=2)
+    assert _candidate(side="SHORT").side == "SHORT"
+    with pytest.raises(ValueError, match="side"):
+        _candidate(side="FLAT")
 
 
 def test_context_prev_session_range_gap_and_first_session_nan():
@@ -223,6 +226,47 @@ def test_engine_fills_at_next_open_with_charges_and_slippage(tmp_path):
         assert conn.execute("SELECT COUNT(*) FROM backtest_runs").fetchone()[0] == 1
         with pytest.raises(sqlite3.OperationalError, match="no such table: trades"):
             conn.execute("SELECT COUNT(*) FROM trades").fetchone()
+
+
+def test_short_candidate_pnl_uses_entry_minus_exit(tmp_path):
+    rows = [
+        {"ts": _ts(11, 9, 15), "open": 101, "high": 102, "low": 100, "close": 101},
+        {"ts": _ts(11, 9, 30), "open": 100, "high": 101, "low": 98, "close": 98},
+        {"ts": _ts(11, 9, 45), "open": 95, "high": 96, "low": 94, "close": 95},
+    ]
+    db_path = _make_db(tmp_path, rows)
+    cand = _candidate(
+        side="SHORT",
+        exit_rule={"left": {"field": "close"}, "op": "<", "right": {"value": 99}},
+        stop_rule={"type": "fixed_pct", "pct": 0.5},
+    )
+
+    result = run_backtest(cand, db_path=db_path, persist=False)
+
+    trade = result.trades[0]
+    assert trade["exit_reason"] == "RULE_EXIT"
+    assert trade["entry_price"] < trade["entry_quote_price"]  # short entry is a SELL
+    assert trade["exit_price"] > trade["exit_quote_price"]    # cover is a BUY
+    assert trade["gross_pnl"] == round(trade["entry_price"] - trade["exit_price"], 2)
+    assert trade["net_pnl"] == round(trade["gross_pnl"] - trade["charges"], 2)
+
+
+def test_short_candidate_stop_triggers_on_upside(tmp_path):
+    rows = [
+        {"ts": _ts(11, 9, 15), "open": 100, "high": 101, "low": 99, "close": 101},
+        {"ts": _ts(11, 9, 30), "open": 100, "high": 101, "low": 99, "close": 100},
+        {"ts": _ts(11, 9, 45), "open": 100, "high": 103, "low": 99, "close": 102},
+        {"ts": _ts(11, 10, 0), "open": 104, "high": 105, "low": 103, "close": 104},
+    ]
+    db_path = _make_db(tmp_path, rows)
+    cand = _candidate(side="SHORT", stop_rule={"type": "fixed_pct", "pct": 0.02})
+
+    result = run_backtest(cand, db_path=db_path, persist=False)
+
+    trade = result.trades[0]
+    assert trade["exit_reason"] == "STOP"
+    assert trade["stop_price"] > trade["entry_price"]
+    assert trade["gross_pnl"] < 0
 
 
 def test_session_end_square_off_closes_without_overnight_position(tmp_path):
