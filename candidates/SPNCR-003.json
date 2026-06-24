@@ -1,0 +1,23 @@
+{
+  "id": "SPNCR-003",
+  "version": "1",
+  "hypothesis": "When RELIANCE opens with an up-gap of at least 0.3% versus the prior session close, the gap tends to FADE over the session rather than continue. The research scan over 64 real sessions found gap-up days averaged about -0.40% intraday (t=-1.84), which clears the ~0.106% round-trip cost. This candidate shorts near the open on a qualifying up-gap and holds to the session square-off with a wide 1% protective stop above entry. If up-gaps do not fade enough to clear costs out-of-sample, the hypothesis is false and the candidate dies. This is a NEW short-side hypothesis, not a tweak of the killed long candidates.",
+  "symbol": "RELIANCE",
+  "interval": "15m",
+  "entry_rule": {
+    "all": [
+      {"left": {"context": "gap_pct"}, "op": ">=", "right": {"value": 0.3}},
+      {"left": {"context": "session_minute"}, "op": "<=", "right": {"value": 15}}
+    ]
+  },
+  "exit_rule": {"left": {"field": "close"}, "op": "<", "right": {"value": 0}},
+  "stop_rule": {"type": "fixed_pct", "pct": 0.01},
+  "sizing_rule": {"type": "max_affordable", "capital_fraction": 1.0},
+  "no_trade_conditions": [],
+  "execution_assumption": {"entry_fill": "next_candle_open", "exit_fill": "next_candle_open"},
+  "parameters": {"gap_up_threshold_pct": 0.3, "entry_window_minute": 15, "stop_pct": 0.01},
+  "tunable_parameters": [],
+  "capital": 5000.0,
+  "max_open_positions": 1,
+  "side": "SHORT"
+}
