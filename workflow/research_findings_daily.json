@@ -1,0 +1,158 @@
+{
+  "generated_at": "2026-06-24T11:17:49.762137+00:00",
+  "timeframe": "1d",
+  "symbol": "RELIANCE",
+  "sessions_analyzed": 2823,
+  "date_range": [
+    "2015-01-01",
+    "2026-06-24"
+  ],
+  "cost_bar_round_trip": 0.0025,
+  "edge_target_3x": 0.0075,
+  "findings": [
+    {
+      "name": "day_of_week_thursday",
+      "hypothesis": "Thursday intraday drift.",
+      "n": 567,
+      "mean": -0.00110233,
+      "t_stat": -1.89,
+      "net_after_cost": -0.001398,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "day_of_week_monday",
+      "hypothesis": "Monday intraday drift.",
+      "n": 563,
+      "mean": -0.00109518,
+      "t_stat": -1.59,
+      "net_after_cost": -0.001405,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "day_of_week_tuesday",
+      "hypothesis": "Tuesday intraday drift.",
+      "n": 567,
+      "mean": -0.00097365,
+      "t_stat": -1.59,
+      "net_after_cost": -0.001526,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "one_day_momentum_up",
+      "hypothesis": "Up close-to-close day continues next day.",
+      "n": 1455,
+      "mean": 0.00086156,
+      "t_stat": 1.95,
+      "net_after_cost": -0.001638,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "one_day_mean_revert_after_up",
+      "hypothesis": "Fade the next day after an up day.",
+      "n": 1455,
+      "mean": -0.00086156,
+      "t_stat": -1.95,
+      "net_after_cost": -0.001638,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "close_to_close_drift",
+      "hypothesis": "Hold one daily close to next daily close.",
+      "n": 2822,
+      "mean": 0.00080709,
+      "t_stat": 2.51,
+      "net_after_cost": -0.001693,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": true
+    },
+    {
+      "name": "one_day_momentum_down",
+      "hypothesis": "Down close-to-close day continues next day.",
+      "n": 1366,
+      "mean": 0.00075162,
+      "t_stat": 1.61,
+      "net_after_cost": -0.001748,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "one_day_mean_revert_after_down",
+      "hypothesis": "Fade the next day after a down day.",
+      "n": 1366,
+      "mean": -0.00075162,
+      "t_stat": -1.61,
+      "net_after_cost": -0.001748,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "gap_down_intraday",
+      "hypothesis": "Gap-down daily open continues/fades into same-day close.",
+      "n": 1087,
+      "mean": -0.00059009,
+      "t_stat": -1.29,
+      "net_after_cost": -0.00191,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "day_of_week_wednesday",
+      "hypothesis": "Wednesday intraday drift.",
+      "n": 569,
+      "mean": 0.00043264,
+      "t_stat": 0.67,
+      "net_after_cost": -0.002067,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "gap_up_intraday",
+      "hypothesis": "Gap-up daily open continues/fades into same-day close.",
+      "n": 1735,
+      "mean": -0.00039873,
+      "t_stat": -1.08,
+      "net_after_cost": -0.002101,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "day_of_week_friday",
+      "hypothesis": "Friday intraday drift.",
+      "n": 557,
+      "mean": 0.00038796,
+      "t_stat": 0.59,
+      "net_after_cost": -0.002112,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    },
+    {
+      "name": "volatility_breakout_followthrough",
+      "hypothesis": "Large daily range is followed by next-day movement.",
+      "n": 346,
+      "mean": -4.02e-06,
+      "t_stat": -0.0,
+      "net_after_cost": -0.002496,
+      "clears_cost_bar": false,
+      "clears_3x_edge_target": false,
+      "significant": false
+    }
+  ],
+  "note": "Hypotheses only. Real daily OHLCV, no fake data, no deployment without Confirm-or-Kill."
+}

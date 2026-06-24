@@ -61,6 +61,20 @@ position max, exactly ₹5,000 paper capital, zero fake data, mastery before exp
 - Day-selection evidence memo (`docs/research/day_selection_evidence_2026-06-12.md`):
   volatility persistence is the best-documented basis; expiry days amplify NSE
   volatility; gap-continuation unsupported; ORB after costs cautious/null.
+- Daily research lane (2026-06-24): backfilled 2,823 real RELIANCE.NS daily bars
+  (2015-01-01..now) via `scripts/daily_history.py`; `scripts/research_scan_daily.py`
+  over all 2,823 sessions found **no single-day pattern clears the 0.25% daily
+  cost bar**. Only `close_to_close_drift` is statistically significant (t=2.51)
+  but its +0.081%/day mean is ~3× too small after costs;
+  `volatility_breakout_followthrough` next-day effect is ~0.00% (t=0). Honest
+  read: RELIANCE has no exploitable *single-day* daily edge. The only remaining
+  daily hope is **multi-day holds** that amortize cost over larger moves
+  (ChatGPT battery #5 vol-compression breakout, #8 volume-climax reversal) —
+  but these are **not yet testable**: the backtest engine reads only
+  `intraday_prices` and force-squares-off every session (`bot/intraday_backtest.py`
+  line ~582), so it cannot hold a position across days. Building a multi-day-hold
+  engine (+ DSL arithmetic for `k×rolling` and close-location filters) is the
+  next real unlock; specced for Codex.
 
 ## Research Ledger (confirm-or-kill)
 
