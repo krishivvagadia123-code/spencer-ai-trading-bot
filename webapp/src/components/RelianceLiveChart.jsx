@@ -30,25 +30,37 @@ function toChartPoints(candles) {
   return points.sort((left, right) => left.time - right.time);
 }
 
-function buildPath(points) {
-  if (points.length < 2) return { line: "", area: "", dot: null, min: null, max: null };
+// Pixel-space layout: coords are computed in the chart's actual pixel size, and
+// the SVG viewBox is set to that same size (1:1), so there is no
+// preserveAspectRatio distortion and the live dot (positioned by px) lands
+// exactly on the line's last point. Robust to any container size / layout.
+const PAD = { top: 16, bottom: 22, left: 2, right: 46 };
+
+function buildPath(points, width, height) {
+  const empty = { line: "", area: "", dot: null, min: null, max: null, coords: [] };
+  if (points.length < 2 || !(width > 0) || !(height > 0)) return empty;
 
   const values = points.map((point) => point.value);
   const min = Math.min(...values);
   const max = Math.max(...values);
-  const range = Math.max(1, max - min);
+  const range = Math.max(1e-6, max - min);
+
+  const plotW = Math.max(1, width - PAD.left - PAD.right);
+  const plotH = Math.max(1, height - PAD.top - PAD.bottom);
 
   const coords = points.map((point, index) => {
-    const x = (index / (points.length - 1)) * 1000;
-    const y = 300 - ((point.value - min) / range) * 250 - 25;
+    const x = PAD.left + (index / (points.length - 1)) * plotW;
+    const y = PAD.top + (1 - (point.value - min) / range) * plotH;
     return { x, y };
   });
 
   const line = coords
     .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
     .join(" ");
-  const area = `${line} L 1000 300 L 0 300 Z`;
-  const dot = coords[coords.length - 1];
+  const last = coords[coords.length - 1];
+  const first = coords[0];
+  const area = `${line} L ${last.x.toFixed(2)} ${height} L ${first.x.toFixed(2)} ${height} Z`;
+  const dot = last;
   return { line, area, dot, min, max, coords };
 }
 
@@ -59,7 +71,22 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
   const [latestPrice, setLatestPrice] = useState(null);
   const [chartError, setChartError] = useState("");
   const [hoverIndex, setHoverIndex] = useState(null);
+  const containerRef = useRef(null);
+  const [size, setSize] = useState({ w: 0, h: 0 });
   const isMarketOpen = String(marketState || "").toUpperCase() === "OPEN";
+
+  // Measure the chart's real pixel size so the SVG viewBox is 1:1 (no
+  // distortion) and the live dot can sit exactly on the line. Re-measures on
+  // any layout/UI change.
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return undefined;
+    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   useEffect(() => {
     onLatestPointRef.current = onLatestPoint;
@@ -161,7 +188,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
     };
   }, []);
 
-  const chart = buildPath(points);
+  const chart = buildPath(points, size.w, size.h);
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
   const hoverPoint = hoverIndex !== null ? points[hoverIndex] : null;
@@ -178,6 +205,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
 
   return (
     <div
+      ref={containerRef}
       className="reliance-live-chart relative h-full w-full min-w-0 overflow-hidden"
       role="img"
       aria-label={`RELIANCE five-minute market line chart${
@@ -198,9 +226,9 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
       {(status === "ready" || status === "stale") && chart.line ? (
         <>
           <svg
-            className="absolute bottom-6 left-0 right-12 top-12 h-[calc(100%-72px)] overflow-visible"
+            className="absolute inset-0 h-full w-full overflow-visible"
             style={{ cursor: "crosshair" }}
-            viewBox="0 0 1000 300"
+            viewBox={`0 0 ${size.w || 1} ${size.h || 1}`}
             preserveAspectRatio="none"
             aria-hidden="true"
             onMouseMove={handlePointerMove}
@@ -229,7 +257,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
                   x1={hoverCoord.x}
                   y1="0"
                   x2={hoverCoord.x}
-                  y2="300"
+                  y2={size.h}
                   stroke="rgba(226,232,240,0.35)"
                   strokeWidth="1.5"
                   strokeDasharray="5 5"
@@ -248,12 +276,12 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
             )}
           </svg>
           {chart.dot && (
-            <div className="pointer-events-none absolute bottom-6 left-0 right-12 top-12" aria-hidden="true">
+            <div className="pointer-events-none absolute inset-0" aria-hidden="true">
               <span
                 className={`absolute block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${isMarketOpen ? "live-pulse" : ""}`}
                 style={{
-                  left: "100%",
-                  top: `${(chart.dot.y / 300) * 100}%`,
+                  left: `${chart.dot.x}px`,
+                  top: `${chart.dot.y}px`,
                   background: isMarketOpen ? "#5eead4" : "#c4b5fd",
                   boxShadow: "0 0 0 3px rgba(9,10,17,0.92)",
                 }}
