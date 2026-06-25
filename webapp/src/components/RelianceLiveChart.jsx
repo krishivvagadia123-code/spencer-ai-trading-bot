@@ -49,7 +49,7 @@ function buildPath(points) {
     .join(" ");
   const area = `${line} L 1000 300 L 0 300 Z`;
   const dot = coords[coords.length - 1];
-  return { line, area, dot, min, max };
+  return { line, area, dot, min, max, coords };
 }
 
 export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint }) {
@@ -58,6 +58,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
   const [points, setPoints] = useState([]);
   const [latestPrice, setLatestPrice] = useState(null);
   const [chartError, setChartError] = useState("");
+  const [hoverIndex, setHoverIndex] = useState(null);
   const isMarketOpen = String(marketState || "").toUpperCase() === "OPEN";
 
   useEffect(() => {
@@ -163,6 +164,17 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
   const chart = buildPath(points);
   const firstPoint = points[0];
   const lastPoint = points[points.length - 1];
+  const hoverPoint = hoverIndex !== null ? points[hoverIndex] : null;
+  const hoverCoord = hoverIndex !== null ? chart.coords?.[hoverIndex] : null;
+
+  const handlePointerMove = (event) => {
+    const count = chart.coords?.length ?? 0;
+    if (count < 2) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (rect.width === 0) return;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    setHoverIndex(Math.round(ratio * (count - 1)));
+  };
 
   return (
     <div
@@ -187,9 +199,12 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
         <>
           <svg
             className="absolute bottom-6 left-0 right-12 top-12 h-[calc(100%-72px)] overflow-visible"
+            style={{ cursor: "crosshair" }}
             viewBox="0 0 1000 300"
             preserveAspectRatio="none"
             aria-hidden="true"
+            onMouseMove={handlePointerMove}
+            onMouseLeave={() => setHoverIndex(null)}
           >
             <defs>
               <linearGradient id="relianceLineFill" x1="0" x2="0" y1="0" y2="1">
@@ -226,7 +241,35 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
                 )}
               </circle>
             )}
+            {hoverCoord && (
+              <g>
+                <line
+                  x1={hoverCoord.x}
+                  y1="0"
+                  x2={hoverCoord.x}
+                  y2="300"
+                  stroke="rgba(226,232,240,0.35)"
+                  strokeWidth="1.5"
+                  strokeDasharray="5 5"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <circle
+                  cx={hoverCoord.x}
+                  cy={hoverCoord.y}
+                  r="6"
+                  fill="#f8fafc"
+                  stroke="rgba(9,10,17,0.95)"
+                  strokeWidth="3"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </g>
+            )}
           </svg>
+          {hoverPoint && (
+            <div className="absolute left-1/2 top-1 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/[0.1] px-3 py-1 text-[10px] font-semibold text-slate-100">
+              {`Rs ${hoverPoint.value.toFixed(2)}`} &middot; {new Date((hoverPoint.time - IST_OFFSET_SECONDS) * 1000).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}
+            </div>
+          )}
           <div className="absolute inset-x-0 bottom-1 flex items-center justify-between text-[10px] font-semibold text-slate-500">
             <span>{firstPoint ? new Date((firstPoint.time - IST_OFFSET_SECONDS) * 1000).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""}</span>
             <span>{lastPoint ? new Date((lastPoint.time - IST_OFFSET_SECONDS) * 1000).toLocaleDateString("en-IN", { day: "2-digit", month: "short" }) : ""}</span>
