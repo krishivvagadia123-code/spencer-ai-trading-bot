@@ -9,10 +9,10 @@ function Reveal({ children, delay = 0, className = "" }) {
   return (
     <motion.div
       className={className}
-      initial={{ opacity: 0, y: 20 }}
+      initial={{ opacity: 0, y: 14 }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-60px" }}
-      transition={{ duration: 0.75, delay, ease: EASE }}
+      transition={{ duration: 0.5, delay, ease: EASE }}
     >
       {children}
     </motion.div>
@@ -21,25 +21,25 @@ function Reveal({ children, delay = 0, className = "" }) {
 
 function SceneHeading({ label, title, sub }) {
   return (
-    <div className="mb-14">
+    <div>
       {label && (
         <motion.p
-          initial={{ opacity: 0, y: 12 }}
+          initial={{ opacity: 0, y: 8 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, ease: EASE }}
-          className="mb-3 text-[12px] font-medium text-[var(--color-muted-dark-text)]"
+          transition={{ duration: 0.45, ease: EASE }}
+          className="metric-label"
         >
           {label}
         </motion.p>
       )}
       {title && (
         <motion.h2
-          initial={{ opacity: 0, y: 16 }}
+          initial={{ opacity: 0, y: 12 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.7, delay: 0.07, ease: EASE }}
-          className="font-display text-[clamp(28px,4vw,42px)] font-semibold leading-tight"
+          transition={{ duration: 0.5, delay: 0.05, ease: EASE }}
+          className="mt-2 font-display text-[clamp(28px,4vw,42px)] font-semibold leading-tight text-slate-100"
           style={{ letterSpacing: "-0.02em" }}
         >
           {title}
@@ -50,8 +50,8 @@ function SceneHeading({ label, title, sub }) {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.7, delay: 0.14, ease: EASE }}
-          className="mt-3 max-w-md text-[15px] leading-relaxed text-[var(--color-muted-dark-text)]"
+          transition={{ duration: 0.5, delay: 0.1, ease: EASE }}
+          className="mt-3 max-w-md text-[15px] leading-relaxed text-slate-400"
         >
           {sub}
         </motion.p>
@@ -68,10 +68,9 @@ export function WhatIsSpencer({
   onNavigate,
 }) {
   return (
-    <div className="-mb-6 md:-mb-10">
-      {/* ── SYSTEM MODULES ─────────────────────────────────────────── */}
-      <div className="module-glass-section mt-36 rounded-[36px] p-5 md:p-8">
-        <div className="module-glass-heading mb-10 max-w-xl rounded-[26px] p-7 md:p-9">
+    <div className="what-spencer-page space-y-8 pb-8">
+      <div className="module-glass-section rounded-[24px] p-5 md:p-8">
+        <div className="module-glass-heading mb-8 max-w-xl rounded-[22px] p-6 md:p-8">
           <Reveal>
             <SceneHeading
               label="System Modules"
@@ -83,28 +82,24 @@ export function WhatIsSpencer({
         <BentoGrid onNavigate={onNavigate} />
       </div>
 
-      {/* ── RESEARCH CORE ──────────────────────────────────────────── */}
-      <div className="research-core-section relative mt-28 w-screen left-1/2 -translate-x-1/2 overflow-hidden py-28 md:py-36">
-        <div className="relative z-10 mx-auto max-w-[1480px] px-5 md:px-10">
-          <div className="liquid-glass-heading mb-12 max-w-xl rounded-[26px] p-7 md:p-9">
+      <div className="research-core-section relative overflow-hidden rounded-[24px] p-5 md:p-8">
+        <div className="relative z-10">
+          <div className="liquid-glass-heading mb-8 max-w-xl rounded-[22px] p-6 md:p-8">
             <Reveal>
               <SceneHeading
                 label="Research Core"
                 title="The instrument panel"
-                sub="A fluid view of the research pipeline from observation to validation."
+                sub="A compact view of the research pipeline from observation to validation."
               />
             </Reveal>
           </div>
-          <Reveal delay={0.1}>
+          <Reveal delay={0.08}>
             <SpencerCore3D />
           </Reveal>
         </div>
       </div>
 
-      {/* ── SPENCER SYSTEM ─────────────────────────────────────────── */}
-      <div className="mt-36">
-        <ScrollStory mainRef={mainRef} quote={quote} botState={botState} ledger={ledger} />
-      </div>
+      <ScrollStory mainRef={mainRef} quote={quote} botState={botState} ledger={ledger} />
     </div>
   );
 }

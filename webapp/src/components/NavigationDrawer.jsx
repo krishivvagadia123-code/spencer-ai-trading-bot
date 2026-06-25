@@ -1,108 +1,97 @@
-import { X, LayoutDashboard, ListOrdered, IndianRupee, Gavel, BrainCircuit, ShieldAlert, User, CircleHelp } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 
-// Clubbed navigation: Orders also holds Holdings + Positions; Brain also holds
-// Research; Funds also holds Trade Tracker.
 const PAGES = [
-  { id: "Dashboard", icon: LayoutDashboard },
-  { id: "WhatIsSpencer", label: "What is Spencer", icon: CircleHelp },
-  { id: "Orders", icon: ListOrdered },
-  { id: "Funds", icon: IndianRupee },
-  { id: "Bids", icon: Gavel },
-  { id: "Brain", icon: BrainCircuit },
-  { id: "Governance", icon: ShieldAlert },
+  { id: "Dashboard" },
+  { id: "Profile" },
+  { id: "Orders" },
+  { id: "Funds" },
+  { id: "Bids" },
+  { id: "Brain" },
+  { id: "Governance" },
+  { id: "WhatIsSpencer", label: "What is Spencer" },
 ];
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.04, delayChildren: 0.1 }
+function NavItem({ page, activePage, onNavigate, compact = false }) {
+  const isActive = activePage === page.id;
+  const label = page.label || page.id;
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={() => onNavigate(page.id)}
+        className={`flex min-w-[68px] flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-[10px] font-semibold transition ${
+          isActive ? "bg-[var(--theme-accent)] text-white shadow-[0_10px_26px_rgba(124,92,255,0.22)]" : "text-slate-500"
+        }`}
+      >
+        <span className="max-w-[72px] truncate">{label}</span>
+      </button>
+    );
   }
-};
 
-const itemVariants = {
-  hidden: { opacity: 0, x: -20 },
-  visible: { opacity: 1, x: 0 }
-};
-
-export function NavigationDrawer({ open, activePage, onNavigate, onClose }) {
   return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 0.5 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 bg-black backdrop-blur-sm"
-            onClick={onClose}
-          />
-          <motion.aside
-            initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
-            transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-[var(--color-elevated-black)] text-[var(--color-primary-light-text)] shadow-[24px_0_80px_rgba(0,0,0,0.5)] overflow-hidden"
-          >
-            {/* Subtle radial gradient */}
-            <div className="absolute top-0 left-0 w-[300px] h-[300px] bg-white opacity-[0.02] blur-[80px] pointer-events-none" />
-
-            <div className="relative flex items-center justify-between border-b border-[var(--color-dark-border)] p-5 z-10">
-              <div>
-                <div className="font-medium tracking-tight">Trader</div>
-                <div className="text-xs text-[var(--color-muted-light-text)] font-mono tracking-widest uppercase mt-0.5">Spencer Studio</div>
-              </div>
-              <button type="button" aria-label="Close navigation" onClick={onClose} className="rounded-full p-2 hover:bg-[rgba(255,255,255,0.1)] transition-colors">
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              animate="visible"
-              className="relative flex-1 overflow-y-auto p-4 z-10"
-            >
-              {PAGES.map(({ id, label, icon: Icon }) => {
-                const isActive = activePage === id;
-                return (
-                  <motion.button
-                    variants={itemVariants}
-                    key={id}
-                    onClick={() => onNavigate(id)}
-                    className={`group relative mb-1.5 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm transition-all ${isActive ? 'text-white bg-[rgba(255,255,255,0.05)]' : 'text-[var(--color-muted-light-text)] hover:bg-[rgba(255,255,255,0.03)] hover:text-white'}`}
-                  >
-                    {isActive && (
-                      <motion.div
-                        layoutId="activeNavRail"
-                        className="absolute left-0 top-1/2 -translate-y-1/2 h-3/4 w-1 bg-[var(--color-verified-accent)] rounded-r-md"
-                        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                      />
-                    )}
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-[var(--color-verified-accent)]' : 'group-hover:text-white'}`} />
-                    <span className="font-medium">{label || id}</span>
-                  </motion.button>
-                );
-              })}
-
-              <div className="my-5 h-px bg-[var(--color-dark-border)]" />
-
-              <motion.button
-                variants={itemVariants}
-                onClick={() => onNavigate("Profile")}
-                className={`group relative flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm transition-all ${activePage === "Profile" ? 'text-white bg-[rgba(255,255,255,0.05)]' : 'text-[var(--color-muted-light-text)] hover:bg-[rgba(255,255,255,0.03)] hover:text-white'}`}
-              >
-                {activePage === "Profile" && (
-                  <motion.div
-                    layoutId="activeNavRail"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 h-3/4 w-1 bg-[var(--color-verified-accent)] rounded-r-md"
-                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  />
-                )}
-                <User className="h-4 w-4" />
-                <span className="font-medium">Profile</span>
-              </motion.button>
-            </motion.div>
-          </motion.aside>
-        </>
+    <button
+      type="button"
+      onClick={() => onNavigate(page.id)}
+      className={`group relative flex w-full items-center rounded-xl px-4 py-3 text-left text-[13px] font-semibold transition ${
+        isActive
+          ? "bg-[var(--theme-accent)] text-white shadow-[0_16px_38px_rgba(124,92,255,0.24)]"
+          : "text-zinc-400 hover:bg-white/[0.07] hover:text-zinc-100"
+      }`}
+    >
+      {isActive && (
+        <motion.span
+          layoutId="sidebarActiveGlow"
+          className="absolute inset-0 rounded-xl bg-white/10"
+          transition={{ type: "spring", stiffness: 340, damping: 34 }}
+        />
       )}
-    </AnimatePresence>
+      <span className="relative">{label}</span>
+    </button>
+  );
+}
+
+export function NavigationDrawer({ activePage, onNavigate }) {
+  return (
+    <>
+      <aside className="spencer-sidebar hidden h-dvh w-[240px] shrink-0 flex-col px-6 py-8 text-white lg:flex">
+        <div className="mb-10">
+          <div className="logo-font text-[25px] leading-none tracking-[-0.04em]">Spencer</div>
+          <div className="mt-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            AI Trading
+          </div>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-2">
+          {PAGES.map((page) => (
+            <NavItem key={page.id} page={page} activePage={activePage} onNavigate={onNavigate} />
+          ))}
+        </nav>
+
+        <div className="mt-8 rounded-[24px] border border-white/10 bg-white/[0.04] p-4">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">
+            Doctrine
+          </div>
+          <div className="mt-2 text-[13px] font-semibold text-white">Paper-only RELIANCE</div>
+          <p className="mt-2 text-[11px] leading-relaxed text-zinc-400">
+            Real data. No broker execution. No fake values.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-[var(--theme-accent)] px-4 py-3 text-[12px] font-bold text-white shadow-[0_16px_38px_rgba(124,92,255,0.24)]"
+          aria-label="Paper mode only"
+        >
+          PAPER MODE
+        </button>
+      </aside>
+
+      <nav className="fixed inset-x-3 bottom-3 z-40 flex items-center gap-2 overflow-x-auto rounded-[26px] border border-white/10 bg-[rgba(12,13,22,0.92)] p-2 shadow-[0_20px_60px_rgba(3,4,12,0.35)] backdrop-blur-md lg:hidden">
+        {PAGES.map((page) => (
+          <NavItem key={page.id} page={page} activePage={activePage} onNavigate={onNavigate} compact />
+        ))}
+      </nav>
+    </>
   );
 }

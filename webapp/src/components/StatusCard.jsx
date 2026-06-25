@@ -1,11 +1,8 @@
-import { AlertCircle } from "lucide-react";
-
-export function StatusCard({ title, message, icon: Icon = AlertCircle }) {
+export function StatusCard({ title, message }) {
   return (
-    <div className="liquid-glass-light flex flex-col items-center justify-center rounded-2xl p-8 text-center">
-      <Icon className="mb-4 h-8 w-8 text-[var(--color-muted-dark-text)]" />
-      <h3 className="mb-2 font-medium">{title}</h3>
-      <p className="max-w-sm text-sm text-[var(--color-muted-dark-text)]">{message}</p>
+    <div className="status-card liquid-glass-light flex min-h-[132px] flex-col justify-center rounded-2xl p-6">
+      <h3 className="font-display text-[20px] font-semibold tracking-tight">{title}</h3>
+      <p className="mt-2 max-w-2xl text-sm leading-relaxed">{message}</p>
     </div>
   );
 }

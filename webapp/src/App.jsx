@@ -28,8 +28,8 @@ import { ONE_STOCK_SYMBOL } from "./utils/constants";
 
 function Section({ title, children }) {
   return (
-    <section>
-      <h2 className="mb-5 font-display text-[20px] font-semibold tracking-tight text-[var(--color-primary-dark-text)]">
+    <section className="page-section">
+      <h2 className="section-title">
         {title}
       </h2>
       {children}
@@ -47,7 +47,6 @@ export default function App() {
   const { data: tradesResets, status: tradesResetsStatus, reload: reloadTradesResets } = useTradesResets();
 
   const [activePage, setActivePage] = useState("Dashboard");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
 
   const mainRef = useRef(null);
@@ -58,20 +57,26 @@ export default function App() {
   };
 
   return (
-    <div className="app-shell flex h-screen flex-col font-sans text-[var(--color-primary-dark-text)]">
-      <Header
-        onMenuOpen={() => setMenuOpen(true)}
+    <div className="app-shell flex h-screen font-sans text-[var(--color-primary-dark-text)]">
+      <NavigationDrawer
+        activePage={activePage}
         onNavigate={navigate}
-        onChatOpen={() => setChatOpen(true)}
-        backendStatus={backendStatus}
-        quote={quote}
       />
 
       <main
         ref={mainRef}
-        className="content-scroll soft-scroll relative flex-1 overflow-y-auto"
+        className="content-scroll soft-scroll relative flex-1 overflow-y-auto pb-24 lg:pb-0"
       >
-        <div className="mx-auto max-w-[1480px] px-5 py-6 md:px-10 md:py-10">
+        <div className="mx-auto w-full max-w-[1480px] min-w-0 px-4 py-4 md:px-8 md:py-6">
+          <Header
+            activePage={activePage}
+            onNavigate={navigate}
+            onChatOpen={() => setChatOpen(true)}
+            backendStatus={backendStatus}
+            quote={quote}
+          />
+
+          <div className="page-content mt-5 md:mt-7">
           {activePage === "Dashboard" && (
             <Dashboard
               mainRef={mainRef}
@@ -87,7 +92,7 @@ export default function App() {
           )}
 
           {activePage === "Orders" && (
-            <div className="space-y-12">
+            <div className="page-stack">
               <Section title="Orders"><Orders botState={botState} /></Section>
               <Section title="Holdings"><Holdings botState={botState} /></Section>
               <Section title="Positions"><Positions botState={botState} /></Section>
@@ -95,7 +100,7 @@ export default function App() {
           )}
 
           {activePage === "Funds" && (
-            <div className="space-y-12">
+            <div className="page-stack">
               <Section title="Funds"><Funds botState={botState} /></Section>
               <Section title="Trade Tracker"><TradeTracker botState={botState} /></Section>
               <Section title="Trades & Resets">
@@ -105,7 +110,7 @@ export default function App() {
           )}
 
           {activePage === "Brain" && (
-            <div className="space-y-12">
+            <div className="page-stack">
               <Section title="Brain"><Brain row={researchRow} status={researchStatus} loadResearch={loadResearch} botState={botState} /></Section>
               <Section title="Research"><Research ledger={ledger} status={ledgerStatus} /></Section>
             </div>
@@ -123,18 +128,9 @@ export default function App() {
               onNavigate={navigate}
             />
           )}
+          </div>
         </div>
       </main>
-
-      <NavigationDrawer
-        open={menuOpen}
-        activePage={activePage}
-        onNavigate={(page) => {
-          navigate(page);
-          setMenuOpen(false);
-        }}
-        onClose={() => setMenuOpen(false)}
-      />
       <SpencerChat open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );

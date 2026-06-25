@@ -64,13 +64,13 @@ function MarketResearchPanel({ row, status, loadResearch, botState }) {
       </div>
 
       <div className="mt-8">
-        <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
+        <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
           <div>
             <div className="text-xs uppercase tracking-widest text-[var(--color-muted-dark-text)]">Regime Trust</div>
-            <p className="mt-2 text-sm text-black/50">Historical backend evidence by market regime.</p>
+            <p className="mt-2 text-sm text-[var(--theme-muted)]">Historical backend evidence by market regime.</p>
           </div>
           {botState?.regimeTrust?.last_updated && (
-            <div className="font-mono text-xs text-black/40">
+            <div className="max-w-full break-words text-right font-mono text-xs text-[var(--theme-muted)]">
               Updated {fmtIST(botState.regimeTrust.last_updated)}
             </div>
           )}
@@ -79,30 +79,30 @@ function MarketResearchPanel({ row, status, loadResearch, botState }) {
         {regimes.length ? (
           <div className="grid gap-3 md:grid-cols-3">
             {regimes.map((regime) => (
-              <div key={regime.regime} className="rounded-2xl border border-black/10 bg-black/[0.03] p-5">
+              <div key={regime.regime} className="page-subcard rounded-2xl p-5">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium">{displayName(regime.regime)}</span>
-                  <span className="font-mono text-sm text-black/60">{pct(Number(regime.trust) * 100, 1)} trust</span>
+                  <span className="font-mono text-sm text-[var(--theme-text)]">{pct(Number(regime.trust) * 100, 1)} trust</span>
                 </div>
                 <div className="mt-5 grid grid-cols-3 gap-3 font-mono text-xs">
                   <div>
-                    <div className="text-black/40">Trades</div>
-                    <div className="mt-1 text-black/70">{regime.trades ?? "N/A"}</div>
+                    <div className="text-[var(--theme-muted)]">Trades</div>
+                    <div className="mt-1 text-[var(--theme-text)]">{regime.trades ?? "N/A"}</div>
                   </div>
                   <div>
-                    <div className="text-black/40">Win rate</div>
-                    <div className="mt-1 text-black/70">{pct(Number(regime.win_rate) * 100, 1)}</div>
+                    <div className="text-[var(--theme-muted)]">Win rate</div>
+                    <div className="mt-1 text-[var(--theme-text)]">{pct(Number(regime.win_rate) * 100, 1)}</div>
                   </div>
                   <div>
-                    <div className="text-black/40">Net PnL</div>
-                    <div className="mt-1 text-black/70">{money(regime.net_pnl, 2)}</div>
+                    <div className="text-[var(--theme-muted)]">Net PnL</div>
+                    <div className="mt-1 text-[var(--theme-text)]">{money(regime.net_pnl, 2)}</div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p className="rounded-2xl border border-black/10 bg-black/[0.03] p-5 text-sm text-black/50">
+          <p className="page-subcard rounded-2xl p-5 text-sm">
             No regime-trust evidence is currently available from the backend.
           </p>
         )}
