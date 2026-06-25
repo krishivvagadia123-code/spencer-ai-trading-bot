@@ -57,14 +57,14 @@ export function SpencerChat({ open, onClose }) {
         <motion.div
           initial={{ x: "100%" }} animate={{ x: 0 }} exit={{ x: "100%" }}
           transition={{ type: "spring", damping: 25, stiffness: 200 }}
-          className="fixed inset-y-0 right-0 z-40 flex w-80 flex-col border-l border-[var(--color-light-border)] bg-[var(--color-surface)] shadow-2xl"
+          className="fixed inset-y-0 right-0 z-40 flex w-80 flex-col border-l border-[var(--theme-border)] bg-[var(--theme-panel)] shadow-2xl"
         >
-          <div className="flex items-center justify-between border-b border-[var(--color-light-border)] p-4">
+          <div className="flex items-center justify-between border-b border-[var(--theme-border)] p-4">
             <div>
               <h3 className="flex items-center gap-2 font-medium"><BrainCircuit className="h-4 w-4" /> Spencer Chat</h3>
-              <div className="mt-1 text-[10px] uppercase tracking-wider text-black/40">Obsidian grounded</div>
+              <div className="mt-1 text-[10px] uppercase tracking-wider text-[var(--theme-muted)]">Obsidian grounded</div>
             </div>
-            <button onClick={onClose} className="rounded-full p-1.5 hover:bg-[var(--color-light-border)]">
+            <button onClick={onClose} className="rounded-full p-1.5 hover:bg-white/[0.06]">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -74,16 +74,16 @@ export function SpencerChat({ open, onClose }) {
                 key={`${message.role}-${index}`}
                 className={`rounded-xl p-3 text-sm leading-relaxed ${
                   message.role === "user"
-                    ? "ml-8 bg-blue-600 text-white"
-                    : "mr-4 border border-black/10 bg-white/70 text-black/70"
+                    ? "ml-8 bg-[var(--theme-accent)] text-white"
+                    : "mr-4 border border-[var(--theme-border)] bg-[var(--theme-card-soft)] text-[var(--theme-text)]"
                 }`}
               >
                 <div className="whitespace-pre-wrap">{message.text}</div>
                 {!!message.citations?.length && (
-                  <div className="mt-3 border-t border-black/10 pt-2">
-                    <div className="text-[10px] uppercase tracking-wider text-black/35">Sources</div>
+                  <div className="mt-3 border-t border-[var(--theme-border)] pt-2">
+                    <div className="text-[10px] uppercase tracking-wider text-[var(--theme-muted)]">Sources</div>
                     {message.citations.map((citation) => (
-                      <div key={citation.path} className="mt-1 font-mono text-[10px] text-black/45">
+                      <div key={citation.path} className="mt-1 font-mono text-[10px] text-[var(--theme-muted)]">
                         {citation.wikilink}
                       </div>
                     ))}
@@ -91,10 +91,10 @@ export function SpencerChat({ open, onClose }) {
                 )}
               </div>
             ))}
-            {sending && <div className="text-xs text-black/40">Searching Obsidian...</div>}
+            {sending && <div className="text-xs text-[var(--theme-muted)]">Searching Obsidian...</div>}
           </div>
-          <div className="border-t border-[var(--color-light-border)] p-4">
-            <form onSubmit={submit} className="flex items-center rounded-lg border border-[var(--color-light-border)] bg-white px-3 py-2">
+          <div className="border-t border-[var(--theme-border)] p-4">
+            <form onSubmit={submit} className="flex items-center rounded-lg border border-[var(--theme-border)] bg-[var(--theme-card-soft)] px-3 py-2">
               <input
                 value={input}
                 onChange={(event) => setInput(event.target.value)}

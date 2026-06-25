@@ -81,11 +81,6 @@ export function Header({ activePage, onNavigate, onChatOpen, backendStatus, quot
           <UserCircle className="h-6 w-6" />
         </button>
       </div>
-      <div className="command-safety-bar">
-        <span>Paper mode</span>
-        <span>Live trading off</span>
-        <span>Broker execution off</span>
-      </div>
     </header>
   );
 }

@@ -1471,3 +1471,60 @@ textarea::placeholder {
     min-height: 104px;
   }
 }
+
+/* =========================================================================
+   Dark-theme contrast + container-definition fix (2026-06-25).
+   The redesign left stale light-theme background rules for .glass-metric /
+   .data-health-panel / .liquid-glass-light earlier in this file, so those
+   surfaces rendered near-white while their text is light (slate-100/400) —
+   invisible. These appended rules win on source order and give a clear
+   two-level hierarchy: panels one dark shade, inner cards a touch lighter
+   with a strong border, so containers no longer blend into the background.
+   ========================================================================= */
+
+/* Outer panels / surfaces */
+.liquid-glass-light,
+.data-health-panel {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012)),
+    rgba(14, 16, 25, 0.78) !important;
+  border: 1px solid var(--theme-border) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.30) !important;
+}
+
+/* Inner cards: lighter shade + stronger border = clear separation */
+.glass-metric,
+.data-health-panel .glass-metric,
+.liquid-glass-light .glass-metric,
+.status-card,
+.page-subcard,
+.background-stat-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0.02)),
+    rgba(30, 33, 49, 0.92) !important;
+  border: 1px solid var(--theme-border-strong) !important;
+  box-shadow: none !important;
+}
+
+/* Section headings (Orders / Holdings / Funds / Trade Tracker) must stay light */
+.section-title {
+  color: var(--theme-text) !important;
+}
+
+/* Tables inside surfaces inherit readable text on the dark theme */
+.liquid-glass-light table,
+.liquid-glass-light th,
+.liquid-glass-light td {
+  color: var(--theme-text);
+}
+.liquid-glass-light thead {
+  color: var(--theme-muted) !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+}
+
+/* Guard against horizontal overflow clipping the right-most card/timestamp */
+.page-section,
+.page-stack,
+.module-glass-section {
+  min-width: 0;
+}
