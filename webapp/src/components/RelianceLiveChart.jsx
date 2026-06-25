@@ -221,26 +221,8 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
               strokeWidth="4"
               vectorEffect="non-scaling-stroke"
             />
-            {chart.dot && (
-              <circle
-                cx={chart.dot.x}
-                cy={chart.dot.y}
-                r="7"
-                fill={isMarketOpen ? "#5eead4" : "#c4b5fd"}
-                stroke="rgba(9,10,17,0.95)"
-                strokeWidth="4"
-                vectorEffect="non-scaling-stroke"
-              >
-                {isMarketOpen && (
-                  <animate
-                    attributeName="opacity"
-                    values="1;0.3;1"
-                    dur="1.4s"
-                    repeatCount="indefinite"
-                  />
-                )}
-              </circle>
-            )}
+            {/* live dot rendered as an HTML overlay below — robust to viewBox
+                distortion and right-edge clipping; uses the proven CSS pulse */}
             {hoverCoord && (
               <g>
                 <line
@@ -265,6 +247,19 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
               </g>
             )}
           </svg>
+          {chart.dot && (
+            <div className="pointer-events-none absolute bottom-6 left-0 right-12 top-12" aria-hidden="true">
+              <span
+                className={`absolute block h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ${isMarketOpen ? "live-pulse" : ""}`}
+                style={{
+                  left: "100%",
+                  top: `${(chart.dot.y / 300) * 100}%`,
+                  background: isMarketOpen ? "#5eead4" : "#c4b5fd",
+                  boxShadow: "0 0 0 3px rgba(9,10,17,0.92)",
+                }}
+              />
+            </div>
+          )}
           {hoverPoint && (
             <div className="absolute left-1/2 top-1 z-20 -translate-x-1/2 whitespace-nowrap rounded-full bg-white/[0.1] px-3 py-1 text-[10px] font-semibold text-slate-100">
               {`Rs ${hoverPoint.value.toFixed(2)}`} &middot; {new Date((hoverPoint.time - IST_OFFSET_SECONDS) * 1000).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", hour12: false })}

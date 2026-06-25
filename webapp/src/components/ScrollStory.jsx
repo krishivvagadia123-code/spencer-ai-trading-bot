@@ -124,12 +124,30 @@ export function ScrollStory({ mainRef, quote, botState, ledger }) {
   const progress = useSpring(rawProgress, { stiffness: 50, damping: 14, restDelta: 0.001 });
   const chapterIdx = useTransform(progress, [0, 1], [0, STEPS.length - 1]);
   const [activeStep, setActiveStep] = useState(0);
+  // Measured, not guessed: the sticky frame must equal the real scroll-viewport
+  // height so it pins cleanly, and the track is a multiple of it so each step
+  // gets ~one screen of scroll. Measuring (vs a magic-number calc tied to the
+  // header size) keeps this correct even if the layout/header/UI changes.
+  const [dims, setDims] = useState({ frame: 0, track: 0 });
 
   useEffect(() => {
     return chapterIdx.on("change", (v) => {
       setActiveStep(Math.min(STEPS.length - 1, Math.max(0, Math.round(v))));
     });
   }, [chapterIdx]);
+
+  useEffect(() => {
+    const container = mainRef?.current;
+    if (!container) return undefined;
+    const measure = () => {
+      const h = container.clientHeight;
+      if (h > 0) setDims({ frame: h, track: h * STEPS.length });
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [mainRef]);
 
   useEffect(() => {
     const container = mainRef?.current;
@@ -157,8 +175,15 @@ export function ScrollStory({ mainRef, quote, botState, ledger }) {
   const currentStep = STEPS[activeStep];
 
   return (
-    <div ref={sectionRef} className="story-scroll-track relative">
-      <div className="glass-story story-sticky-frame w-full overflow-hidden rounded-[24px]">
+    <div
+      ref={sectionRef}
+      className="story-scroll-track relative"
+      style={dims.track ? { height: dims.track } : undefined}
+    >
+      <div
+        className="glass-story story-sticky-frame w-full overflow-hidden rounded-[24px]"
+        style={dims.frame ? { height: dims.frame } : undefined}
+      >
         <div
           className="pointer-events-none absolute inset-0"
           style={{
