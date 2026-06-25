@@ -1353,7 +1353,10 @@ textarea::placeholder {
   color: var(--theme-text);
   min-width: 0;
   max-width: 100%;
-  overflow-x: hidden;
+  /* clip (not hidden): prevents horizontal overflow WITHOUT becoming a scroll
+     container, so descendant position:sticky (the What-is-Spencer pinned panel,
+     etc.) keeps working. overflow-x:hidden here silently broke the pin. */
+  overflow-x: clip;
 }
 
 .page-stack {
