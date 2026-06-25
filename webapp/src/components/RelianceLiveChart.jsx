@@ -186,7 +186,7 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
       {(status === "ready" || status === "stale") && chart.line ? (
         <>
           <svg
-            className="absolute inset-x-0 bottom-6 top-12 h-[calc(100%-72px)] w-full overflow-visible"
+            className="absolute bottom-6 left-0 right-12 top-12 h-[calc(100%-72px)] overflow-visible"
             viewBox="0 0 1000 300"
             preserveAspectRatio="none"
             aria-hidden="true"
@@ -215,7 +215,16 @@ export function RelianceLiveChart({ marketState, marketStateLabel, onLatestPoint
                 stroke="rgba(9,10,17,0.95)"
                 strokeWidth="4"
                 vectorEffect="non-scaling-stroke"
-              />
+              >
+                {isMarketOpen && (
+                  <animate
+                    attributeName="opacity"
+                    values="1;0.3;1"
+                    dur="1.4s"
+                    repeatCount="indefinite"
+                  />
+                )}
+              </circle>
             )}
           </svg>
           <div className="absolute inset-x-0 bottom-1 flex items-center justify-between text-[10px] font-semibold text-slate-500">
