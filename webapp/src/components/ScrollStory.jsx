@@ -182,7 +182,7 @@ export function ScrollStory({ mainRef, quote, botState, ledger }) {
     >
       <div
         className="glass-story story-sticky-frame w-full overflow-hidden rounded-[24px]"
-        style={dims.frame ? { height: dims.frame } : undefined}
+        style={dims.frame ? { height: dims.frame, top: 0, minHeight: 0 } : undefined}
       >
         <div
           className="pointer-events-none absolute inset-0"
